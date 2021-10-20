@@ -15,6 +15,11 @@ global label
 import argparse
 import os.path
 from os import path
+from itertools import combinations
+from scipy.spatial.distance import pdist, squareform, cdist
+from scipy.spatial import distance
+import scipy
+import itertools
 
 
 def read_label(dataset):
@@ -72,7 +77,7 @@ def main():
     parser.add_argument('--dataset', help='Insert the dataset')
     parser.add_argument('--house', type=int,
                         help='Insert the house of the dataset')
-    parser.add_argument('--appliance', help='Insert the appliance that you want to create a graph')
+    parser.add_argument('--appliance', help='Inττυsert the appliance that you want to create a graph')
     # parser.add_argument('--p2pkh', help='Insert a p2pkh')
     args = parser.parse_args()
     dataset = args.dataset
@@ -82,9 +87,9 @@ def main():
     # if path.exists('/graphs/'+ dataset + house + str(appliance)):
     #     exit('Try another Graph')
 
-
     dataset = 'low_freq'  # args.dataset
-
+    house = 'house_1'
+    appliance = 'mains_1'
     if dataset != ' UK-REFIT':
         labels = read_label(dataset)
         for i in range(1, 3):
@@ -96,27 +101,28 @@ def main():
         df[i] = read_merge_data(i, labels, dataset)
     # alt_df = df[1]['mains_1'].diff()
 
-    edgelist = pd.DataFrame(columns=['source', 'destination', 'weight'])
-    edgelist['source'] = df[1]['mains_1'].diff().shift(-1).iloc[:-1]
-    # edgelist = edgelist[:-1]
-    # edgelist['source'] = edgelist['source'].shift(-1)# .dropna()
-    edgelist = edgelist.iloc[1:, :]
-    edgelist.reset_index(inplace=True)
-
-    timestamps = edgelist['source'].iloc[0::2].index
-    temp = edgelist['source'].iloc[1::]
-    # edgelist = edgelist[:-1]
-    edgelist['destination'] = temp
-    edgelist['destination'] = edgelist['destination'].shift(-1)
-    # edgelist = pd.DataFrame(
-    #     {'source': edgelist['source'].iloc[::2].values, 'destination': edgelist['source'].iloc[1::2].values})
-    edgelist.set_index(timestamps, inplace=True)
-    edgelist['gaussian_kernel'] = np.exp(
-        -(4 * np.log(2) * (edgelist['source'] - edgelist['destination']) ** 2) / 5 ** 2)
+    nodes = pd.DataFrame(columns=['source', 'Timestamp'])
+    nodes['drift'] = df[1]['mains_1'].diff().shift(-1).iloc[:-1][:100]
+    threshold = nodes['drift'].abs().mean()
+    nodes['Timestamp'] = nodes.index
+    nodes = nodes[abs(nodes['drift']) > threshold]
+    # edgelist.reset_index(inplace=True)
+    edgelist = pd.DataFrame(
+        [(x[0], x[1], np.exp(
+            -(4 * np.log(2) * (np.linalg.norm(x[0] - x[1]))) ** 10) / 2 ** 2) for x in
+         itertools.combinations(nodes['drift'], 2)],
+        columns=['source', 'destination', 'gaussian_kernel'])
 
     G = nx.from_pandas_edgelist(df=edgelist, source='source', target='destination', edge_attr=True,
-                                create_using=nx.MultiDiGraph(name='Nilm_Graph'))
-    nx.write_gpickle(G, '/graphs/'+ dataset + house + str(appliance))
+                                create_using=nx.Graph(name='Nilm_Graph'))
+
+    for index, row in nodes.iterrows():
+        G.nodes[row['drift']]['Timestamp'] = row['Timestamp']
+        # G.nodes[row['destination']]['attr_1'] = row['tgt_attr_1']
+
+    nx.write_gpickle(G, "test.gpickle")
+    exit()
+    nx.write_gpickle(G, '/graphs/' + dataset + house + str(appliance))
 
 
 if __name__ == '__main__':
