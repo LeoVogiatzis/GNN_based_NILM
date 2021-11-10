@@ -1,8 +1,15 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
 import warnings
 
 import pandas as pd
 from IPython.display import display
 import networkx as nx
+import time
 
 pd.options.display.max_columns = 20
 warnings.filterwarnings("ignore")
@@ -20,6 +27,9 @@ from scipy.spatial.distance import pdist, squareform, cdist
 from scipy.spatial import distance
 import scipy
 import itertools
+
+
+# In[2]:
 
 
 def read_label(dataset):
@@ -67,62 +77,36 @@ def read_merge_data(house, labels, dataset):
     return df
 
 
-def gaussian(alt_df):
-    return np.exp(-(4 * np.log(2) * alt_df ** 2) / 5 ** 2)
-
-
-def main():
-    # parsing arguments
-    parser = argparse.ArgumentParser(description='Load Benchmark NIlM datasets and create a graph')
-    parser.add_argument('--dataset', help='Insert the dataset')
-    parser.add_argument('--house', type=int,
-                        help='Insert the house of the dataset')
-    parser.add_argument('--appliance', help='Inττυsert the appliance that you want to create a graph')
-    # parser.add_argument('--p2pkh', help='Insert a p2pkh')
-    args = parser.parse_args()
-    dataset = args.dataset
-    house = args.house
-    appliance = args.appliance
-
-    # if path.exists('/graphs/'+ dataset + house + str(appliance)):
-    #     exit('Try another Graph')
-
-    dataset = 'low_freq'  # args.dataset
-    house = 'house_1'
-    appliance = 'mains_1'
-    if dataset != ' UK-REFIT':
-        labels = read_label(dataset)
-        for i in range(1, 3):
-            print('House {}: '.format(i), labels[i], '\n')
-
-    # data = pd.read_csv('UK-REFIT/House_1.csv')
-    df = {}
-    for i in range(1, 7):
-        df[i] = read_merge_data(i, labels, dataset)
-    # alt_df = df[1]['mains_1'].diff()
-
-    nodes = pd.DataFrame(columns=['source', 'Timestamp'])
-    nodes['drift'] = df[1]['mains_1'].diff().shift(-1).iloc[:-1][:100]
+def graph_creation(device):
+    nodes = pd.DataFrame(columns=['drift', 'Timestamp'])
+    nodes['drift'] = device.diff().shift(-1).iloc[:-1][:1000]
     threshold = nodes['drift'].abs().mean()
     nodes['Timestamp'] = nodes.index
     nodes = nodes[abs(nodes['drift']) > threshold]
     # edgelist.reset_index(inplace=True)
     edgelist = pd.DataFrame(
-        [(x[0], x[1], np.exp(
-            -(4 * np.log(2) * (np.linalg.norm(x[0] - x[1]))) ** 10) / 2 ** 2) for x in
+        [(x[0], x[1], np.exp(-(4 * np.log(2) * (np.linalg.norm(x[0] - x[1]))) ** 10) / 2 ** 2) for x in
          itertools.combinations(nodes['drift'], 2)],
         columns=['source', 'destination', 'gaussian_kernel'])
-
+    nodes["state"] = np.where(nodes["drift"] > 0, 1, 0)
     G = nx.from_pandas_edgelist(df=edgelist, source='source', target='destination', edge_attr=True,
                                 create_using=nx.Graph(name='Nilm_Graph'))
-
     for index, row in nodes.iterrows():
+        print(row['Timestamp'])
+        print(row['state'])
+        print(f'Add node features {device.name}')
         G.nodes[row['drift']]['Timestamp'] = row['Timestamp']
-        # G.nodes[row['destination']]['attr_1'] = row['tgt_attr_1']
+        G.nodes[row['drift']]['state'] = row['state']
 
-    nx.write_gpickle(G, "test.gpickle")
-    exit()
-    nx.write_gpickle(G, '/graphs/' + dataset + house + str(appliance))
+    nx.write_gpickle(G, 'graphs/' + str(device.name) + '.gpickle')
+
+
+def main():
+    house5 = pd.read_csv('data/house5.csv')
+    # house5.drop(columns=['Unnamed: 0'], inplace=True)
+    print(house5.columns)
+    # graph_creation(house5['subpanel_11'])
+    house5[house5.columns].apply(lambda x: graph_creation(x))
 
 
 if __name__ == '__main__':
