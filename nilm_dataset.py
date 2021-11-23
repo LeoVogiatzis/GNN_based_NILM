@@ -1,3 +1,4 @@
+import networkx as nx
 import pandas as pd
 import torch
 import torch_geometric
@@ -11,15 +12,15 @@ print(f"Cuda available: {torch.cuda.is_available()}")
 print(f"Torch geometric version: {torch_geometric.__version__}")
 
 
-class MoleculeDataset(Dataset):
+class NilmDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None):
-        """
-        root = Where the dataset should be stored. This folder is split
+        """2
+        root = Where the dataset should be stored. This folder is split 
         into raw_dir (downloaded dataset) and processed_dir (processed data).
         """
         self.test = test
         self.filename = filename
-        super(MoleculeDataset, self).__init__(root, transform, pre_transform)
+        super(NilmDataset, self).__init__(root, transform, pre_transform)
 
     @property
     def raw_file_names(self):
@@ -50,7 +51,8 @@ class MoleculeDataset(Dataset):
             # Get adjacency info
             edge_index = self._get_adjacency_info(graph)
             # Get labels info
-            label = self._get_labels(...) # pass label here. E.g. if it is a column for this graph it could be graph_csv['label']
+            label = self._get_labels(
+                ...)  # pass label here. E.g. if it is a column for this graph it could be graph_csv['label']
 
             # Create data object
             data = Data(x=node_feats, edge_index=edge_index, y=label)
@@ -74,7 +76,6 @@ class MoleculeDataset(Dataset):
         all_node_feats = np.asarray(all_node_feats)
         return torch.tensor(all_node_feats, dtype=torch.float)
 
-
     def _get_adjacency_info(self, graph):
         """
         We could also use torch_geometric.from_networkx to create a Data object
@@ -83,9 +84,9 @@ class MoleculeDataset(Dataset):
 
         edge_indices = []
         for edge in graph.edges:
-            i = edge[0] # get source
-            j = edge[1] # get destination
-            edge_indices += [[i, j], [j, i]] # undirected graph
+            i = edge[0]  # get source
+            j = edge[1]  # get destination
+            edge_indices += [[i, j], [j, i]]  # undirected graph
 
         edge_indices = torch.tensor(edge_indices)
         edge_indices = edge_indices.t().to(torch.long).view(2, -1)
@@ -107,3 +108,12 @@ class MoleculeDataset(Dataset):
         else:
             data = torch.load(os.path.join(self.processed_dir, f'data_{idx}.pt'))
         return data
+
+
+def main():
+    G = nx.read_gpickle('graphs/mains_1.gpickle')
+    x=1
+
+
+if __name__ == '__main__':
+    main()
