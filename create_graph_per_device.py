@@ -70,7 +70,7 @@ def main():
     house5 = pd.read_csv('data/house5.csv')
     # house5.drop(columns=['Unnamed: 0'], inplace=True)
     print(house5.columns)
-    # graph_creation(house5['lighting_4'])
+    graph_creation(house5['lighting_4'])
     house5[house5.columns].apply(lambda x: graph_creation(x))
 
 
