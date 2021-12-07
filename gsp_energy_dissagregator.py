@@ -11,50 +11,21 @@ import numpy as np
 import math
 
 
-# %%
+def graph_creation(data_vec, sigma,
+                   window=1000):  # this defines  number of observations in a window, the algorthm works in a sliding window manner
+    data_aggr = []
 
-
-def graph_creation(event, delta_p, sigma):
-    winL = 1000  # this defines  number of observations in a window, the algorthm works in a sliding window manner
-    Smstar = np.zeros((len(event), 1))
-    for k in range(0, int(np.floor(len(event) / winL))):
-        r = []
-        event_1 = event[k * winL:((k + 1) * winL)]
-        # followed as such from the MATLAB code
-        r.append(delta_p[event[0]])
-        [r.append(delta_p[event_1[i]]) for i in range(0, len(event_1))]
-        templen = winL + 1
-        Sm = np.zeros((templen, 1))
-        Sm[0] = 1;
-
-        Am = np.zeros((templen, templen))
-        for i in range(0, templen):
-            for j in range(0, templen):
-                Am[i, j] = math.exp(-((r[i] - r[j]) / sigma) ** 2);
-                # Gaussian kernel weighting function
-        Dm = np.zeros((templen, templen));
-        # create diagonal matrix
-        for i in range(templen):
-            Dm[i, i] = np.sum(Am[:, i]);
-        Lm = Dm - Am;
-        Smstar[k * winL:(k + 1) * winL] = np.matmul(np.linalg.pinv(Lm[1:templen, 1:templen]),
-                                                    ((-Sm[0].T) * Lm[0, 1:templen]).reshape(-1, 1));
-        x = 1
-        return Smstar, Lm, Dm, Am
-
-
-def dataset_preprocessing():
-    df.index = pd.to_datetime(df.index)
-    dfd = pd.read_csv(csvfiledisaggr, index_col="Time")  # read file with ground truth disaggregated appliances
-    dfd.index = pd.to_datetime(dfd.index)
-
-    # select date range
-    start_date = '2011-04-23'  # from 2011-04-23
-    end_date = '2011-05-02'  # to 2011-05-01
-    mask = (df.index > start_date) & (df.index < end_date)
-    df = df.loc[mask]
-    mask = (dfd.index > start_date) & (dfd.index < end_date)
-    dfd = dfd.loc[mask]
+    for k in range(0, int(np.floor(len(data_vec) / window))):
+        data_aggr.append(np.mean(data_vec[k * window:((k + 1) * window)]))
+    
+    if (len(data_vec) % window > 0):
+        data_aggr.append(np.mean(data_vec[int(np.floor(len(data_vec) / window)) * window:]))
+    delta_p = [np.round(data_aggr[i + 1] - data_aggr[i], 2) for i in range(0, len(data_aggr) - 1)]
+    Am = np.zeros((len(delta_p), len(delta_p)))
+    for i in range(0, Am.shape[0]):
+        for j in range(0, Am.shape[1]):
+            Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / sigma) ** 2)
+    return Am
 
 
 def main():
@@ -76,17 +47,14 @@ def main():
     instancelimit = 3
 
     # %%
-    main_val = df[['dishwaser_20']].values  # get only readings
+    main_val = df['dishwaser_20'].values  # get only readings
     # main_ind = df.index  # get only timestamp
     data_vec = main_val
     # signature_database = "signature_database_labelled.csv"  # the signatures were extracted of power analysis from April 28th to 30th
     threshold = 2000  # threshold of DTW algorithm used for appliance power signature matching
 
-    delta_p = [np.round(data_vec[i + 1] - data_vec[i], 2) for i in range(0, len(data_vec) - 1)]
-    event = [i for i in range(0, len(delta_p))]
-
-    # event = [i for i in range(0, len(delta_p)) if (delta_p[i] > T_Positive or delta_p[i] < T_Negative)]
-    Smstar, Lm, Dm, Am = graph_creation(event, delta_p, sigma)
+    Am = graph_creation(data_vec, sigma, window=77)
+    x = 1
 
 
 if __name__ == '__main__':
