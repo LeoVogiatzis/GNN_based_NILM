@@ -54,14 +54,6 @@ def graph_creation(device):
         G.nodes[node]['state'] = nodes['state'][node]
         G.nodes[node]['drift'] = nodes['drift'][node]
 
-    # for index, row in nodes.iterrows():
-    #     print(device)
-    #     # print(row['Timestamp'])
-    #     # print(row['state'])
-    #     print(f'Add node features {device.name}')
-    #     G.nodes[row['drift']]['Timestamp'] = row['Timestamp']
-    #     G.nodes[row['drift']]['state'] = row['state']
-
     nx.write_graphml(G, 'graphs/' + str(device.name) + '.graphml')
 
 

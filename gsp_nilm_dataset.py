@@ -39,13 +39,15 @@ def graph_creation(data_vec, sigma,
 
 
 class NilmDataset(Dataset):
-    def __init__(self, root, filename, test=False, transform=None, pre_transform=None):
+    def __init__(self, root, filename, window, sigma, test=False, transform=None, pre_transform=None):
         """2
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data).
         """
         self.test = test
         self.filename = filename
+        self.window = window
+        self.sigma = sigma
         super(NilmDataset, self).__init__(root, transform, pre_transform)
 
     @property
@@ -53,46 +55,49 @@ class NilmDataset(Dataset):
         """ If this file exists in raw_dir, the download is not triggered.
             (The download func. is not implemented here)
         """
-        return self.filename
+        return [self.filename]
 
     @property
     def processed_file_names(self):
         """ If these files are found in raw_dir, processing is skipped"""
-        self.data = pd.read_csv(self.raw_paths[0]).reset_index()
+        data = pd.read_csv(self.raw_paths[0]).reset_index()
         if self.test:
-            return [f'data_test_{i}.pt' for i in list(self.data.index)]
+            return [f'data_test_{i}.pt' for i in list(data.index)]
         else:
-            return [f'data_{i}.pt' for i in list(self.data.index)]
+            return [f'data_{i}.pt' for i in list(data.index)]
 
     def download(self):
         pass
 
     def process(self):
-        # TODO: read graphs below
-        self.data = pd.read_csv(self.raw_paths[0])
-        window = 20;
-        sigma = 20;
-        main_val = self.data['dishwaser_20'].values  # get only readings
-        data_vec = main_val
-        edge_index, drift = self._get_adjacency_info(data_vec, window, sigma)
+        idx = 0
+        for raw_path in self.raw_paths:
+            appliance = pd.read_csv(raw_path).reset_index()
+            main_val = appliance['dishwaser_20'].values  # get only readings
+            data_vec = main_val
+            adjacency, drift = self._get_adjacency_info(data_vec)
+            edge_indices = self._to_edge_index(adjacency)
 
-        edge_indices = torch.tensor(edge_index)
-        drift = np.asarray(drift)
-        drift = drift.reshape((-1, 1))
-        drift = torch.tensor(drift, dtype=torch.float)
-        labels = [0 if i == 0.0 else 1 for i in drift]
-        # labels = [1 if (i > 0 and i != 0) else -1 for i in drift if i!=0]
-        labels = torch.tensor(labels, dtype=torch.int64)
-        # edge_indices = edge_indices.t().to(torch.long).view(2, -1)
+            # node_feats = np.asarray(drift)
+            # node_feats = node_feats.reshape((-1, 1))
+            # node_feats = torch.tensor(node_feats, dtype=torch.float)
+            labels = np.asarray(drift)
+            labels = torch.tensor(labels, dtype=torch.int64)
 
-        self.data = Data(x=drift, edge_index=edge_indices, y=labels,
-                    #  train_mask=[2000], test_mask=[2000]
-                    )
+            data = Data(edge_index=edge_indices, y=labels,
+                        #  train_mask=[2000], test_mask=[2000]
+                        )
+            if self.pre_filter is not None and not self.pre_filter(data):
+                continue
 
-        if self.test:
-            torch.save(self.data, os.path.join(self.processed_dir, 'data_test_0.pt'))
-        else:
-            torch.save(self.data, os.path.join(self.processed_dir, 'data_0.pt'))
+            if self.pre_transform is not None:
+                data = self.pre_transform(data)
+
+            if self.test:
+                torch.save(data, os.path.join(self.processed_dir, f'data_test_{idx}.pt'))
+            else:
+                torch.save(data, os.path.join(self.processed_dir, f'data_{idx}.pt'))
+            idx += 1
 
     def _get_node_features(self, graph):
         """
@@ -108,28 +113,37 @@ class NilmDataset(Dataset):
         all_node_feats = all_node_feats.reshape((-1, 1))
         return torch.tensor(all_node_feats, dtype=torch.float)
 
-    def _get_adjacency_info(self, data_vec, window, sigma):
+    def _get_adjacency_info(self, data_vec):
         data_aggr = []
 
-        for k in range(0, int(np.floor(len(data_vec) / window))):
-            data_aggr.append(np.mean(data_vec[k * window:((k + 1) * window)]))
+        for k in range(0, int(np.floor(len(data_vec) / self.window))):
+            data_aggr.append(np.mean(data_vec[k * self.window:((k + 1) * self.window)]))
 
-        if (len(data_vec) % window > 0):
-            data_aggr.append(np.mean(data_vec[int(np.floor(len(data_vec) / window)) * window:]))
+        if (len(data_vec) % self.window > 0):
+            data_aggr.append(np.mean(data_vec[int(np.floor(len(data_vec) / self.window)) * self.window:]))
         delta_p = [np.round(data_aggr[i + 1] - data_aggr[i], 2) for i in range(0, len(data_aggr) - 1)]
         Am = np.zeros((len(delta_p), len(delta_p)))
         for i in range(0, Am.shape[0]):
             for j in range(0, Am.shape[1]):
-                Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / sigma) ** 2)
+                Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / self.sigma) ** 2)
+        Am = np.where(Am >= 0.5, 1, 0)
         return Am, delta_p
 
-    def _get_labels(self, labels):
-        labels = list(labels.values())
-        labels = np.asarray(labels)
-        return torch.tensor(labels, dtype=torch.int64)
+    def _to_edge_index(self, adjacency):
+
+        edge_indices = []
+        for i in range(0, adjacency.shape[0]):
+            for j in range(i, adjacency.shape[0]):
+                if adjacency[i, j] != 0.0:
+                    edge_indices += [[i, j], [j, i]]
+
+        edge_indices = torch.tensor(edge_indices)
+        edge_indices = edge_indices.t().to(torch.long).view(2, -1)
+
+        return edge_indices
 
     def len(self):
-        return self.data.shape[0]
+        return len(self.processed_file_names)
 
     def get(self, idx):
         """ - Equivalent to __getitem__ in pytorch
@@ -143,10 +157,9 @@ class NilmDataset(Dataset):
 
 
 def main():
-    data = NilmDataset(root='data', filename='dishwasher.csv')
-    print(data.data.y)
-    print(data.data)
-    x = 1
+    dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+    data = dataset[0]
+    print(data)
 
 
 if __name__ == '__main__':

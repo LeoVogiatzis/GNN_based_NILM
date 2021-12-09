@@ -19,12 +19,12 @@ from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
 
+
 # from IPython.display import Javascript  # Restrict height of output cell.
 
 # display(Javascript('''google.colab.output.setIframeHeight(0, true, {maxHeight: 300})'''))
 
 # model = GCN(in_channels = dataset.x.shape[1], hidden_channels=dataset.x.shape[1])
-
 
 
 class NilmDataset(Dataset):
@@ -187,7 +187,6 @@ def test(model):
     return test_acc
 
 
-
 data = NilmDataset(root='data', filename='dishwaser_20.graphml')
 print(data.data.y)
 # transform = RandomNodeSplit()
@@ -204,11 +203,6 @@ model = GCN(in_channels=train_data.x.shape[1], hidden_channels=train_data.x.shap
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 criterion = torch.nn.CrossEntropyLoss()
 
-
-
 for epoch in range(1, 101):
     loss = train(model)
     print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}')
-
-
-
