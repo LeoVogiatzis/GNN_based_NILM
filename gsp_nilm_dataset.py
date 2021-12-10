@@ -21,23 +21,6 @@ import torch.nn.functional as F
 import math
 
 
-def graph_creation(data_vec, sigma,
-                   window=1000):  # this defines  number of observations in a window, the algorthm works in a sliding window manner
-    data_aggr = []
-
-    for k in range(0, int(np.floor(len(data_vec) / window))):
-        data_aggr.append(np.mean(data_vec[k * window:((k + 1) * window)]))
-
-    if (len(data_vec) % window > 0):
-        data_aggr.append(np.mean(data_vec[int(np.floor(len(data_vec) / window)) * window:]))
-    delta_p = [np.round(data_aggr[i + 1] - data_aggr[i], 2) for i in range(0, len(data_aggr) - 1)]
-    Am = np.zeros((len(delta_p), len(delta_p)))
-    for i in range(0, Am.shape[0]):
-        for j in range(0, Am.shape[1]):
-            Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / sigma) ** 2)
-    return Am, delta_p
-
-
 class NilmDataset(Dataset):
     def __init__(self, root, filename, window, sigma, test=False, transform=None, pre_transform=None):
         """2
@@ -83,7 +66,6 @@ class NilmDataset(Dataset):
             # node_feats = torch.tensor(node_feats, dtype=torch.float)
             labels = np.asarray(drift)
             labels = torch.tensor(labels, dtype=torch.int64)
-
             data = Data(edge_index=edge_indices, y=labels,
                         #  train_mask=[2000], test_mask=[2000]
                         )
@@ -159,6 +141,7 @@ class NilmDataset(Dataset):
 def main():
     dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
     data = dataset[0]
+    degrees = torch_geometric.utils.degree(index=data.edge_index)
     print(data)
 
 
