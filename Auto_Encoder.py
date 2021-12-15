@@ -1,4 +1,9 @@
-import networkx as nx
+import sklearn
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+from torch_geometric.utils import negative_sampling, remove_self_loops, add_self_loops
+from torch_geometric.nn.inits import reset
+from torch_geometric.nn import GCNConv, BatchNorm
 import pandas as pd
 import torch
 import torch_geometric
@@ -19,6 +24,79 @@ from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
 import math
+from sklearn.model_selection import train_test_split
+
+EPS = 1e-15
+MAX_LOGSTD = 10
+epochs = 20
+
+
+class GCNEncoder(torch.nn.Module):
+    def __init__(self, dims, dropout):
+        super(GCNEncoder, self).__init__()
+        self.dropout = dropout
+        self.layers = torch.nn.ModuleList()
+        for i in range(len(dims) - 1):
+            conv = GCNConv(dims[i], dims[i + 1])
+            self.layers.append(conv)
+
+    def forward(self, x, edge_index):
+        num_layers = len(self.layers)
+        for idx, layer in enumerate(self.layers):
+            if idx < num_layers - 1:
+                x = layer(x, edge_index)
+                x = F.relu(x)
+                x = F.dropout(x, p=self.dropout, training=self.training)
+            else:
+                x = layer(x, edge_index)
+
+        return x
+
+
+class InnerProductDecoder(torch.nn.Module):
+
+    def forward(self, z, edge_index, sigmoid=True):
+        value = (z[edge_index[0]] * z[edge_index[1]]).sum(dim=1)
+        return torch.sigmoid(value) if sigmoid else value
+
+
+class GAE(torch.nn.Module):
+
+    def __init__(self, dims, dropout):
+        super(GAE, self).__init__()
+        self.encoder = GCNEncoder(dims, dropout)
+        self.decoder = InnerProductDecoder()
+        GAE.reset_parameters(self)
+
+    def reset_parameters(self):
+        reset(self.encoder)
+        reset(self.decoder)
+
+    def encode(self, *args, **kwargs):
+        return self.encoder(*args, **kwargs)
+
+    def decode(self, *args, **kwargs):
+        return self.decoder(*args, **kwargs)
+
+    def recon_loss(self, z, pos_edge_index, neg_edge_index=None):
+        """Given latent variables, computes the binary cross entropy loss for positive edges and negative sampled edges.
+        Args:
+            z (Tensor): The latent space representations.
+            pos_edge_index (LongTensor): The positive edges to train against.
+            neg_edge_index (LongTensor, optional): The negative edges to train against.
+                If not given, uses negative sampling to calculate negative edges.
+        """
+
+        pos_loss = -torch.log(self.decoder(z, pos_edge_index, sigmoid=True) + EPS).mean()
+
+        # Do not include self-loops in negative samples
+        pos_edge_index, _ = remove_self_loops(pos_edge_index)
+        pos_edge_index, _ = add_self_loops(pos_edge_index)
+        if neg_edge_index is None:
+            neg_edge_index = negative_sampling(pos_edge_index, z.size(0))
+        neg_loss = -torch.log(1 - self.decoder(z, neg_edge_index, sigmoid=True) + EPS).mean()
+
+        return pos_loss + neg_loss
 
 
 class NilmDataset(Dataset):
@@ -140,11 +218,35 @@ class NilmDataset(Dataset):
 
 
 def main():
-    dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+    from torch_geometric.datasets import Planetoid
+    from torch_geometric.transforms import NormalizeFeatures
+    dataset = Planetoid(root='data/Planetoid', name='Cora', transform=NormalizeFeatures())
     data = dataset[0]
-    degrees = torch_geometric.utils.degree(index=data.edge_index[0])
-    data.x = degrees
-    print(data)
+    print(data.y)
+    # ------------------------------------------------------------------------------------
+    # dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+    # data = dataset[0]
+    # degrees = torch_geometric.utils.degree(index=data.edge_index[0])
+    # data.x = degrees
+    # print(data)
+    # ------------------------------------------------------------------------------------
+    model = GAE([2, 2], dropout=0.2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = torch.nn.MSELoss()
+
+    for i in range(epochs):
+        optimizer.zero_grad()
+        # z = model.encode(data.x, data.train_pos_edge_index)
+        z = model.encode(data.x, data.edge_index)
+        out = model.decode(z, data.edge_index)
+
+        loss = criterion(data.x, out, sigmoid=True)
+        # loss = model.recon_loss(z, data.train_pos_edge_index)
+        loss.backward()
+        optimizer.step()
+
+    model.encode(data.x, data.edge_index)
+    print(model)
 
 
 if __name__ == '__main__':
