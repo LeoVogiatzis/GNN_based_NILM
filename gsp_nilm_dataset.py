@@ -2,6 +2,7 @@ import networkx as nx
 import pandas as pd
 import torch
 import torch_geometric
+from torch_geometric import data
 from torch_geometric.data import Dataset, Data
 import numpy as np
 import os
@@ -19,6 +20,8 @@ from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
 import math
+from torch_geometric.utils import erdos_renyi_graph, to_networkx, from_networkx
+import matplotlib.pyplot as plt
 
 
 class NilmDataset(Dataset):
@@ -133,7 +136,7 @@ class NilmDataset(Dataset):
             - Is not needed for PyG's InMemoryDataset
         """
         if self.test:
-            data = torch.load(os.path.join(self.processed_dir, f'data_test_{idx}.pt'))
+            data = torch.load(os.path.join(self.processed_dir, f'data_-test_{idx}.pt'))
         else:
             data = torch.load(os.path.join(self.processed_dir, f'data_{idx}.pt'))
         return data
@@ -142,7 +145,8 @@ class NilmDataset(Dataset):
 def main():
     dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
     data = dataset[0]
-    degrees = torch_geometric.utils.degree(index=data.edge_index[0])
+    # G = to_networkx(data)
+    degrees = torch_geometric.utils.degree(data.edge_index[0])
     data.x = degrees
     print(data)
 

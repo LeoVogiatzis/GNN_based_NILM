@@ -218,17 +218,17 @@ class NilmDataset(Dataset):
 
 
 def main():
-    from torch_geometric.datasets import Planetoid
-    from torch_geometric.transforms import NormalizeFeatures
-    dataset = Planetoid(root='data/Planetoid', name='Cora', transform=NormalizeFeatures())
-    data = dataset[0]
-    print(data.y)
-    # ------------------------------------------------------------------------------------
-    # dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+    # from torch_geometric.datasets import Planetoid
+    # from torch_geometric.transforms import NormalizeFeatures
+    # dataset = Planetoid(root='data/Planetoid', name='Cora', transform=NormalizeFeatures())
     # data = dataset[0]
-    # degrees = torch_geometric.utils.degree(index=data.edge_index[0])
-    # data.x = degrees
-    # print(data)
+    # print(data.y)
+    # ------------------------------------------------------------------------------------
+    dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+    data = dataset[0]
+    degrees = torch_geometric.utils.degree(index=data.edge_index[0])
+    data.x = degrees
+    print(data)
     # ------------------------------------------------------------------------------------
     model = GAE([2, 2], dropout=0.2)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
