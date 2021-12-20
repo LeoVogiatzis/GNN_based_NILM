@@ -56,22 +56,25 @@ def plot_df(df, title):
     fig.show()
 
 
-def read_merge_features(house, labels):
-    path = 'high_freq/house_{}/'.format(house)
-    file = path + 'current_1.dat'
-    df = pd.read_table(file, sep=' ', names=['unix_time', labels[house][1]],
-                       dtype={'unix_time': 'int64', labels[house][1]: 'float64'})
-
-    num_apps = len(glob.glob(path + 'current*'))
-    for i in range(2, num_apps + 1):
-        file = path + 'current{}.dat'.format(i)
-        data = pd.read_table(file, sep=' ', names=['unix_time', labels[house][i]],
-                             dtype={'unix_time': 'int64', labels[house][i]: 'float64'})
-        df = pd.merge(df, data, how='inner', on='unix_time')
-    df['timestamp'] = df['unix_time'].astype("datetime64[s]")
-    df = df.set_index(df['timestamp'].values)
-    df.drop(['unix_time', 'timestamp'], axis=1, inplace=True)
+def get_proper_indexes(df):
+    df[0] = df[0].astype("datetime64[s]")
+    df[0] = pd.to_datetime(df[0], unit='s')
+    df.set_index(df[0].values, inplace=True)
+    df.drop(columns=[0], inplace=True)
     return df
+
+
+def get_features(df):
+    df_currents = pd.read_csv('high_freq/house_3/current_1.dat', sep=' ', header=None)
+    df2_currents = pd.read_csv('high_freq/house_3/current_2.dat', sep=' ', header=None)
+    df_voltage = pd.read_csv('high_freq/house_3/voltage.dat', sep=' ', header=None)
+    df_voltage = get_proper_indexes(df_voltage)
+    merged_currents = pd.concat([df_currents, df2_currents])
+    merged_currents = get_proper_indexes(merged_currents)
+    merged_high_frequency = pd.merge(merged_currents, df_voltage, left_index=True, right_index=True)
+    merged_features = pd.merge(df[3], merged_high_frequency, left_index=True, right_index=True)
+
+    return merged_features
 
 
 def standardization(df):
@@ -103,7 +106,7 @@ def main():
             i, len(dates[i]), dates[i][0], dates[i][-1]))
         print(dates[i], '\n')
 
-    df_currents = pd.read_csv('high_freq/house_3/current_1.dat', sep=' ', header=None)
+    high_freq_features = get_features(df)
 
     for i in range(3, 5, 2):
         plot_df(df[i].loc[:dates[i][1]], 'First 2 day data of house {}'.format(i))
