@@ -39,8 +39,8 @@ def test(model, data):
     return acc
 
 
-def node_representations(dataset):
-    data = dataset[0]
+def node_representations(data):
+    # data = dataset[0]
     # from torch_geometric.datasets import Planetoid
     # from torch_geometric.transforms import NormalizeFeatures
     # dataset = Planetoid(root='data/Planetoid', name='Cora', transform=NormalizeFeatures())
@@ -74,3 +74,5 @@ def node_representations(dataset):
     plt.ylabel("Loss")
     plt.legend()
     plt.show()
+
+    return model
