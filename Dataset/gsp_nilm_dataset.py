@@ -16,12 +16,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torch_geometric.transforms import RandomLinkSplit, RandomNodeSplit
 import torch
-from torch.nn import Linear
-from torch_geometric.nn import GCNConv
-import torch.nn.functional as F
 import math
-from torch_geometric.utils import erdos_renyi_graph, to_networkx, from_networkx
-import matplotlib.pyplot as plt
 
 
 class NilmDataset(Dataset):
@@ -67,12 +62,28 @@ class NilmDataset(Dataset):
             # node_feats = np.asarray(drift)
             # node_feats = node_feats.reshape((-1, 1))
             # node_feats = torch.tensor(node_feats, dtype=torch.float)
+            edge_feats = torch.tensor(edge_indices.clone().detach(), dtype=torch.float)
             labels = np.asarray(drift)
             labels = torch.tensor(labels, dtype=torch.int64)
 
-            data = Data(edge_index=edge_indices, y=labels,
+            data = Data(edge_index=edge_indices, y=labels, edge_attr=edge_feats
                         #  train_mask=[2000], test_mask=[2000]
                         )
+
+            # splitting the data into train, validation and test
+            X_train, X_test, y_train, y_test = train_test_split(
+                pd.Series(np.asarray([i for i in range(data.num_nodes)], dtype=np.int64)),
+                pd.Series(np.asarray(labels, dtype=np.float32)), test_size=0.30, random_state=42)
+
+            n_nodes = data.num_nodes
+
+            # create train and test masks for data
+            train_mask = torch.zeros(n_nodes, dtype=torch.bool)
+            test_mask = torch.zeros(n_nodes, dtype=torch.bool)
+            train_mask[X_train.index] = True
+            test_mask[X_test.index] = True
+            data['train_mask'] = train_mask
+            data['test_mask'] = test_mask
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
 
@@ -141,15 +152,15 @@ class NilmDataset(Dataset):
             data = torch.load(os.path.join(self.processed_dir, f'data_{idx}.pt'))
         return data
 
+# def main():
+#     dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+#     data = dataset[0]
+#     # G = to_networkx(data)
+#     degrees = torch_geometric.utils.degree(data.edge_index[0])
+#     n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
+#     data.x = degrees
+#     print(data)
 
-def main():
-    dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
-    data = dataset[0]
-    # G = to_networkx(data)
-    degrees = torch_geometric.utils.degree(data.edge_index[0])
-    data.x = degrees
-    print(data)
-
-
-if __name__ == '__main__':
-    main()
+#
+# if __name__ == '__main__':
+#     main()
