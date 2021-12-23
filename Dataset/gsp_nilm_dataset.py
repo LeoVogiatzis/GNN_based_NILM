@@ -62,11 +62,12 @@ class NilmDataset(Dataset):
             # node_feats = np.asarray(drift)
             # node_feats = node_feats.reshape((-1, 1))
             # node_feats = torch.tensor(node_feats, dtype=torch.float)
-            edge_feats = torch.tensor(edge_indices.clone().detach(), dtype=torch.float)
+            # edge_feats = torch.tensor(edge_indices.clone().detach(), dtype=torch.float)
             labels = np.asarray(drift)
             labels = torch.tensor(labels, dtype=torch.int64)
 
-            data = Data(edge_index=edge_indices, y=labels, edge_attr=edge_feats
+            data = Data(edge_index=edge_indices, y=labels
+                        # , edge_attr=edge_feats
                         #  train_mask=[2000], test_mask=[2000]
                         )
 

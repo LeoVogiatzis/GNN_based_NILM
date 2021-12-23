@@ -40,12 +40,6 @@ def test(model, data):
 
 
 def node_representations(data):
-    # data = dataset[0]
-    # from torch_geometric.datasets import Planetoid
-    # from torch_geometric.transforms import NormalizeFeatures
-    # dataset = Planetoid(root='data/Planetoid', name='Cora', transform=NormalizeFeatures())
-    # data = dataset[0]
-    # print(data.y)
     print(data.edge_index)
     print(data.train_mask)
     model = Node2Vec(data.edge_index, embedding_dim=128, walk_length=20,
