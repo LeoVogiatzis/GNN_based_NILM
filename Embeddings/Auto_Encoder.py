@@ -187,7 +187,7 @@ class NilmDataset(Dataset):
         for i in range(0, Am.shape[0]):
             for j in range(0, Am.shape[1]):
                 Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / self.sigma) ** 2)
-        Am = np.where(Am >= 0.5, 1, 0)
+        Am = np.where(Am >= 0.8, 1, 0)
         return Am, delta_p
 
     def _to_edge_index(self, adjacency):
@@ -224,29 +224,39 @@ def main():
     # data = dataset[0]
     # print(data.y)
     # ------------------------------------------------------------------------------------
-    dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+    dataset = NilmDataset(root='../data', filename='dishwasher.csv', window=20, sigma=20)
     data = dataset[0]
     degrees = torch_geometric.utils.degree(index=data.edge_index[0])
     data.x = degrees
+    data.x = degrees.reshape((-1, 1))
+    data.y = data.y.type(torch.FloatTensor)
     print(data)
+    transform = RandomLinkSplit(is_undirected=True)
+    train_data, val_data, test_data = transform(data)
+    # train_data, val_data, test_data = transform(data)
+    print(train_data, val_data, test_data)
     # ------------------------------------------------------------------------------------
-    model = GAE([2, 2], dropout=0.2)
+    model = GAE([data.x.shape[1], data.x.shape[1]], dropout=0.2)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss()
 
     for i in range(epochs):
         optimizer.zero_grad()
-        # z = model.encode(data.x, data.train_pos_edge_index)
-        z = model.encode(data.x, data.edge_index)
-        out = model.decode(z, data.edge_index)
+        # z = model.encode(train_data.x, train_data.edge_index)
+        z = model.encode(train_data.x, train_data.edge_index)
+        out = model.decode(z, train_data.edge_index)
+        ground_truth = (train_data.x[train_data.edge_index[0]] * train_data.x[train_data.edge_index[1]]).sum(dim=1)
 
-        loss = criterion(data.x, out, sigmoid=True)
-        # loss = model.recon_loss(z, data.train_pos_edge_index)
+        loss = criterion(ground_truth, out)
+        # loss = model.recon_loss(z, train_data.edge_index)
+        print(loss.item())
         loss.backward()
         optimizer.step()
 
-    model.encode(data.x, data.edge_index)
+    z = model.encode(data.x, data.edge_index)
     print(model)
+    data.x = z
+    print(data.x, z.shape)
 
 
 if __name__ == '__main__':

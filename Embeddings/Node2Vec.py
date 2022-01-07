@@ -42,7 +42,7 @@ def test(model, data):
 def node_representations(data):
     print(data.edge_index)
     print(data.train_mask)
-    model = Node2Vec(data.edge_index, embedding_dim=128, walk_length=20,
+    model = Node2Vec(data.edge_index, embedding_dim=1, walk_length=20,
                      context_size=10, walks_per_node=10,
                      num_negative_samples=1, p=1, q=1, sparse=True).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)

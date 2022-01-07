@@ -14,8 +14,14 @@ def main():
     dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
     data = dataset[0]
     print(data)
+    degrees = torch_geometric.utils.degree(data.edge_index[0])
+    #     n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
+    #     data.x = degrees
+    #     print(data)
+    data.x = degrees
+    print(data.x)
     nodes = node_representations(data)
-    data.x = nodes
+    # data.x = nodes
 
     # transform = RandomLinkSplit(is_undirected=True)
     # train_data, val_data, test_data = transform(data)
@@ -39,8 +45,6 @@ def main():
     print('Test Accuracy: %s' % test_acc)
     print('#' * 70)
     exit('------------------------TEST--------------------------')
-
-
 
     for epoch in range(1, 10):
         loss = model.train(model, optimizer, train_data, criterion)

@@ -23,6 +23,7 @@ class GCN(torch.nn.Module):
 
         return x
 
+
 def train(model, optimizer, train_data, criterion):
     model.train()
     optimizer.zero_grad()  # Clear gradients.
