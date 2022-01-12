@@ -21,7 +21,6 @@ from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
 import networkit as nk
 import time
-import matplotlib.pyplot as plt
 
 
 class NilmDataset(Dataset):
@@ -71,13 +70,25 @@ class NilmDataset(Dataset):
             labels = np.asarray(drift)
             labels = torch.tensor(labels, dtype=torch.int64)
 
-            data = Data(
-                x=node_feats,
-                edge_index=edge_indices, y=labels
-                # , edge_attr=edge_feats
-                #  train_mask=[2000], test_mask=[2000]
-            )
+            data = Data(edge_index=edge_indices, y=labels
+                        # , edge_attr=edge_feats
+                        #  train_mask=[2000], test_mask=[2000]
+                        )
 
+            # splitting the data into train, validation and test
+            # X_train, X_test, y_train, y_test = train_test_split(
+            #     pd.Series(np.asarray([i for i in range(data.num_nodes)], dtype=np.int64)),
+            #     pd.Series(np.asarray(labels, dtype=np.float32)), test_size=0.30, random_state=42)
+
+            # n_nodes = data.num_nodes
+            #
+            # # create train and test masks for data
+            # train_mask = torch.zeros(n_nodes, dtype=torch.bool)
+            # test_mask = torch.zeros(n_nodes, dtype=torch.bool)
+            # train_mask[X_train.index] = True
+            # test_mask[X_test.index] = True
+            # data['train_mask'] = train_mask
+            # data['test_mask'] = test_mask
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
 
@@ -104,15 +115,15 @@ class NilmDataset(Dataset):
         all_node_feats = []
         G = nk.Graph(n=3872)
         for iy, ix in np.ndindex(adjacency.shape):
-            if (iy != ix) and (adjacency[iy, ix] != 0):
-                G.addEdge(iy, ix)
+            # if (iy != ix) and (adjacency[iy, ix] != 0):
+            G.addEdge(iy, ix)
 
         bc = nk.centrality.Betweenness(G)
         bc.run()
         t2 = time.process_time() - t0
         print("Time elapsed betweeness: ", t2)
         print(f'The 10 most central nodes according to betweenness are then{bc.ranking()[:10]}')
-
+        exit()
         close = nk.centrality.Closeness(G, False, nk.centrality.ClosenessVariant.Generalized)
         close.run()
         t3 = time.process_time() - t0
@@ -132,12 +143,11 @@ class NilmDataset(Dataset):
         t1 = time.process_time() - t0
         print("Time elapsed: ", t1)  # CPU seconds elapsed (floating point)
         print('-----------------------Calculation of Centrality Measures is completed-----------------------')
+
         all_node_feats.extend([[i[1] for i in bc.ranking()[:]], [i[1] for i in pr.ranking()[:]],
-                               [i[1] for i in close.ranking()[:]], [i[1] for i in ec.ranking()[:]],
-                               # [i[1] for i in btwn.ranking()[:]]
-                               ])
+                               [i[1] for i in close.ranking()[:]], [i[1] for i in ec.ranking()[:]]])
         all_node_feats = np.asarray(all_node_feats).transpose()
-        # all_node_feats = all_node_feats.reshape((-1, 1))
+        all_node_feats = all_node_feats.reshape((-1, 1))
         return torch.tensor(all_node_feats, dtype=torch.float)
 
     def _get_adjacency_info(self, data_vec):
@@ -153,7 +163,7 @@ class NilmDataset(Dataset):
         for i in range(0, Am.shape[0]):
             for j in range(0, Am.shape[1]):
                 Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / self.sigma) ** 2)
-        Am = np.where(Am >= 0.5, 1, 0)
+        Am = np.where(Am >= 0.8, 1, 0)
         return Am, delta_p
 
     def _to_edge_index(self, adjacency):
@@ -229,16 +239,16 @@ def test(model):
 dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
 data = dataset[0]
 print(data)
-# data = data.to(device)
-# degrees = torch_geometric.utils.degree(data.edge_index[0])
+degrees = torch_geometric.utils.degree(data.edge_index[0])
 #     n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
 #     data.x = degrees
 #     print(data)
-# data.x = degrees.reshape((-1, 1))
+data.x = degrees.reshape((-1, 1))
 data.y = data.y.type(torch.FloatTensor)
 
 transform = RandomLinkSplit(is_undirected=True)
 train_data, val_data, test_data = transform(data)
+# train_data, val_data, test_data = transform(data)
 print(train_data, val_data, test_data)
 
 model = GCN(in_channels=train_data.x.shape[1], hidden_channels=train_data.x.shape[1],
@@ -247,22 +257,13 @@ model = GCN(in_channels=train_data.x.shape[1], hidden_channels=train_data.x.shap
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 criterion = torch.nn.MSELoss()
 epochs = 20
-train_losses = []
-val_losses = []
-for epoch in range(1, 200):
+
+for epoch in range(1, 10):
     loss = train(model)
-    test_loss = test(model)
-    train_losses.append(loss.item())
-    val_losses.append(test_loss.item())
+    # acc = test(model)
+    # train_losses.append(loss)
+    # val_losses.append(acc)
     print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
 print(model)
-plt.figure(figsize=(10, 5))
-plt.title("Training and Validation Loss")
-plt.plot(val_losses, label="val")
-plt.plot(train_losses, label="train")
-plt.xlabel("iterations")
-plt.ylabel("Loss")
-plt.legend()
-plt.show()
 
 exit('test')

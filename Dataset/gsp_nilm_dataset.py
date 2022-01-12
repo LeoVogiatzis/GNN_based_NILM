@@ -17,6 +17,8 @@ from sklearn.preprocessing import StandardScaler
 from torch_geometric.transforms import RandomLinkSplit, RandomNodeSplit
 import torch
 import math
+import networkit as nk
+import time
 
 
 class NilmDataset(Dataset):
@@ -58,7 +60,7 @@ class NilmDataset(Dataset):
             data_vec = main_val
             adjacency, drift = self._get_adjacency_info(data_vec)
             edge_indices = self._to_edge_index(adjacency)
-
+            node_feats = self._get_node_features(adjacency)
             # node_feats = np.asarray(drift)
             # node_feats = node_feats.reshape((-1, 1))
             # node_feats = torch.tensor(node_feats, dtype=torch.float)
@@ -66,12 +68,10 @@ class NilmDataset(Dataset):
             labels = np.asarray(drift)
             labels = torch.tensor(labels, dtype=torch.int64)
 
-            data = Data(edge_index=edge_indices, y=labels
+            data = Data(x=node_feats, edge_index=edge_indices, y=labels
                         # , edge_attr=edge_feats
                         #  train_mask=[2000], test_mask=[2000]
                         )
-
-            # splitting the data into train, validation and test
             X_train, X_test, y_train, y_test = train_test_split(
                 pd.Series(np.asarray([i for i in range(data.num_nodes)], dtype=np.int64)),
                 pd.Series(np.asarray(labels, dtype=np.float32)), test_size=0.30, random_state=42)
@@ -97,18 +97,54 @@ class NilmDataset(Dataset):
                 torch.save(data, os.path.join(self.processed_dir, f'data_{idx}.pt'))
             idx += 1
 
-    def _get_node_features(self, graph):
+    def _get_node_features(self, adjacency):
         """
         This will return a matrix / 2d array of the shape
         [Number of Nodes, Node Feature size]
 
-        We could also use torch_geometric.from_networkx to create a Data object
-        with both adjacency and features, but instead we do it manually here
+        We could also use networkit module to calculate
+        efficiently centrality(ranking) measures
         """
-        all_node_feats = list(nx.get_node_attributes(graph, 'drift').values())
 
-        all_node_feats = np.asarray(all_node_feats)
-        all_node_feats = all_node_feats.reshape((-1, 1))
+        t0 = time.process_time()
+        print("Hello")
+        all_node_feats = []
+        G = nk.Graph(n=3872)
+        for iy, ix in np.ndindex(adjacency.shape):
+            if (iy != ix) and (adjacency[iy, ix] != 0):
+                G.addEdge(iy, ix)
+
+        bc = nk.centrality.Betweenness(G)
+        bc.run()
+        t2 = time.process_time() - t0
+        print("Time elapsed betweeness: ", t2)
+        print(f'The 10 most central nodes according to betweenness are then{bc.ranking()[:10]}')
+
+        close = nk.centrality.Closeness(G, False, nk.centrality.ClosenessVariant.Generalized)
+        close.run()
+        t3 = time.process_time() - t0
+        print("Time elapsed closeness: ", t3)
+        print(f'The top 10 nodes based on closeness centrality are{close.ranking()[:10]}')
+        # PageRank using L1 norm, and a 100 maximum iterations
+        pr = nk.centrality.PageRank(G, 1e-6)
+        pr.run()  # the 10 most central nodes
+        t4 = time.process_time() - t0
+        print("Time elapsed: ", t4)
+        print(f'The top 10 nodes based on pagerank measure are{pr.ranking()[:10]}')  # the 10 most central nodes
+        ec = nk.centrality.EigenvectorCentrality(G)
+        ec.run()
+        t5 = time.process_time() - t0
+        print("Time elapsed eigenvector: ", t5)
+        print(f'The top 10 nodes based on eigenvector centrality are{ec.ranking()[:10]}')
+        t1 = time.process_time() - t0
+        print("Time elapsed: ", t1)  # CPU seconds elapsed (floating point)
+        print('-----------------------Calculation of Centrality Measures is completed-----------------------')
+        all_node_feats.extend([[i[1] for i in bc.ranking()[:]], [i[1] for i in pr.ranking()[:]],
+                               [i[1] for i in close.ranking()[:]], [i[1] for i in ec.ranking()[:]],
+                               # [i[1] for i in btwn.ranking()[:]]
+                               ])
+        all_node_feats = np.asarray(all_node_feats).transpose()
+        # all_node_feats = all_node_feats.reshape((-1, 1))
         return torch.tensor(all_node_feats, dtype=torch.float)
 
     def _get_adjacency_info(self, data_vec):
