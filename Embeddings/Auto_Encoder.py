@@ -258,20 +258,7 @@ class NilmDataset(Dataset):
         return data
 
 
-def main():
-    # from torch_geometric.datasets import Planetoid
-    # from torch_geometric.transforms import NormalizeFeatures
-    # dataset = Planetoid(root='data/Planetoid', name='Cora', transform=NormalizeFeatures())
-    # data = dataset[0]
-    # print(data.y)
-    # ------------------------------------------------------------------------------------
-    dataset = NilmDataset(root='../data', filename='dishwasher.csv', window=20, sigma=20)
-    data = dataset[0]
-    # degrees = torch_geometric.utils.degree(index=data.edge_index[0])
-    # data.x = degrees
-    # data.x = degrees.reshape((-1, 1))
-    data.y = data.y.type(torch.FloatTensor)
-    print(data)
+def pairwise_auto_encoder(data):
     transform = RandomLinkSplit(is_undirected=True)
     train_data, val_data, test_data = transform(data)
     # train_data, val_data, test_data = transform(data)
@@ -291,14 +278,11 @@ def main():
         loss = criterion(ground_truth, out)
         # loss = model.recon_loss(z, train_data.edge_index)
         print(loss.item())
-        loss.backward()
+        loss.backward(retain_graph=True)
         optimizer.step()
 
     z = model.encode(data.x, data.edge_index)
     print(model)
     data.x = z
     print(data.x, z.shape)
-
-
-if __name__ == '__main__':
-    main()
+    return data

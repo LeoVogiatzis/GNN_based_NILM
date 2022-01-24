@@ -68,7 +68,9 @@ class NilmDataset(Dataset):
             labels = np.asarray(drift)
             labels = torch.tensor(labels, dtype=torch.int64)
 
-            data = Data(x=node_feats, edge_index=edge_indices, y=labels
+            data = Data(
+                x=node_feats,
+                edge_index=edge_indices, y=labels
                         # , edge_attr=edge_feats
                         #  train_mask=[2000], test_mask=[2000]
                         )

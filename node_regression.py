@@ -10,10 +10,11 @@ import torch
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torch_geometric.transforms import RandomLinkSplit, RandomNodeSplit
-
+from Embeddings.Auto_Encoder import pairwise_auto_encoder
 import torch
 from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 
 class GCN(torch.nn.Module):
@@ -37,7 +38,7 @@ class GCN(torch.nn.Module):
         return x
 
 
-def train(model, optimizer, train_data, criterion):
+def train(model):
     model.train()
     optimizer.zero_grad()  # Clear gradients.
     # out = model(dataset.x, dataset.edge_index)  # Perform a single forward pass.
@@ -46,12 +47,12 @@ def train(model, optimizer, train_data, criterion):
     print(train_data.y)
     # loss = criterion(out[dataset.train_mask], dataset.y[dataset.train_mask])  # Compute the loss solely based on the training nodes.
     loss = criterion(out, train_data.y.view(-1, 1))
-    loss.backward()  # Derive gradients.
+    loss.backward(retain_graph=True)  # Derive gradients.
     optimizer.step()  # Update parameters based on gradients.
     return loss
 
 
-def test(model, test_data, criterion):
+def test(model):
     model.eval()
     out = model(test_data.x, test_data.edge_index)
     test_loss = criterion(out, test_data.y.view(-1, 1))
@@ -59,40 +60,51 @@ def test(model, test_data, criterion):
     return test_loss
 
 
-def main():
-    dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
-    data = dataset[0]
-    print(data)
-    # degrees = torch_geometric.utils.degree(data.edge_index[0])
-    #     n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
-    #     data.x = degrees
-    #     print(data)
-    # data.x = degrees
-    print(data.x)
+dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+data = dataset[0]
+print(data)
+
+embedding_method = 'Node2Vec'
+if embedding_method == 'Node2Vec':
     embeddings = node_representations(data)
-    data.x = embeddings
+    data.x = embeddings.data
 
-    transform = RandomLinkSplit(is_undirected=True)
-    train_data, val_data, test_data = transform(data)
-    print(train_data, val_data, test_data)
+elif embedding_method == 'AE':
+    data = pairwise_auto_encoder(data)
 
-    model = GCN(in_channels=2, hidden_channels=2, out_channels=1)
+else:
+    print(data.x)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-    criterion = torch.nn.MSELoss()
-    epochs = 20
+data.y = data.y.type(torch.FloatTensor)
+print(data.x)
 
-    for epoch in range(1, 10):
-        loss = train(model, optimizer, train_data, criterion)
-        acc = test(model, test_data, criterion)
-        # train_losses.append(loss)
-        # val_losses.append(acc)
-        print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
-    print(model)
-    results = model(data.x, data.edge_index)
-    print(results)
-    print('End Pipeline')
+transform = RandomLinkSplit(is_undirected=True)
+train_data, val_data, test_data = transform(data)
+print(train_data, val_data, test_data)
 
+model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
 
-if __name__ == '__main__':
-    main()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+criterion = torch.nn.MSELoss()
+epochs = 20
+train_losses = []
+val_losses = []
+for epoch in range(1, 5000):
+    loss = train(model)
+    # acc = test(model, test_data, criterion)
+    test_loss = test(model)
+    train_losses.append(loss.item())
+    val_losses.append(test_loss.item())
+    print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
+print(model)
+results = model(data.x, data.edge_index)
+print(results)
+plt.figure(figsize=(10, 5))
+plt.title("Training and Validation Loss")
+plt.plot(val_losses, label="val")
+plt.plot(train_losses, label="train")
+plt.xlabel("iterations")
+plt.ylabel("Loss")
+plt.legend()
+plt.show()
+print('End Pipeline')

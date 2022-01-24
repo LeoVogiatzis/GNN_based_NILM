@@ -22,6 +22,9 @@ import torch.nn.functional as F
 import networkit as nk
 import time
 import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class NilmDataset(Dataset):
@@ -226,6 +229,16 @@ def test(model):
     return test_loss
 
 
+def conventional_ml():
+    regr = RandomForestRegressor(n_estimators=10, random_state=0)
+    regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
+    from sklearn.metrics import mean_squared_error
+
+    mse = mean_squared_error(np.array(train_data.y), regr.predict(np.array(train_data.x)).reshape(-1, 1))
+    print(mse)
+    exit('Random Forest Classifier end')
+
+
 dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
 data = dataset[0]
 print(data)
@@ -243,13 +256,13 @@ print(train_data, val_data, test_data)
 
 model = GCN(in_channels=train_data.x.shape[1], hidden_channels=train_data.x.shape[1],
             out_channels=1)
-
+# model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 criterion = torch.nn.MSELoss()
 epochs = 20
 train_losses = []
 val_losses = []
-for epoch in range(1, 200):
+for epoch in range(1, 20):
     loss = train(model)
     test_loss = test(model)
     train_losses.append(loss.item())
