@@ -55,8 +55,9 @@ class NilmDataset(Dataset):
     def process(self):
         idx = 0
         for raw_path in self.raw_paths:
-            appliance = pd.read_csv(raw_path).reset_index()
-            main_val = appliance['dishwaser_20'].values  # get only readings
+            appliance = pd.read_csv(raw_path, index_col=0).reset_index()
+            # appliance[raw_path[9:-4]]
+            main_val = appliance[raw_path[9:-4]].values  # get only readings
             data_vec = main_val
             adjacency, drift = self._get_adjacency_info(data_vec)
             edge_indices = self._to_edge_index(adjacency)
@@ -71,9 +72,9 @@ class NilmDataset(Dataset):
             data = Data(
                 x=node_feats,
                 edge_index=edge_indices, y=labels
-                        # , edge_attr=edge_feats
-                        #  train_mask=[2000], test_mask=[2000]
-                        )
+                # , edge_attr=edge_feats
+                #  train_mask=[2000], test_mask=[2000]
+            )
             X_train, X_test, y_train, y_test = train_test_split(
                 pd.Series(np.asarray([i for i in range(data.num_nodes)], dtype=np.int64)),
                 pd.Series(np.asarray(labels, dtype=np.float32)), test_size=0.30, random_state=42)
@@ -162,7 +163,9 @@ class NilmDataset(Dataset):
         for i in range(0, Am.shape[0]):
             for j in range(0, Am.shape[1]):
                 Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / self.sigma) ** 2)
-        Am = np.where(Am >= 0.5, 1, 0)
+        Am = np.where(Am != 1, 0, 1)
+        print(np.count_nonzero(Am))
+        # exit('Test')
         return Am, delta_p
 
     def _to_edge_index(self, adjacency):

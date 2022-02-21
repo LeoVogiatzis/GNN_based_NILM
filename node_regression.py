@@ -60,11 +60,11 @@ def test(model):
     return test_loss
 
 
-dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='mains_2.csv', window=20, sigma=20)
 data = dataset[0]
 print(data)
 
-embedding_method = 'Node2Vec'
+embedding_method = ''
 if embedding_method == 'Node2Vec':
     embeddings = node_representations(data)
     data.x = embeddings.data
@@ -89,7 +89,7 @@ criterion = torch.nn.MSELoss()
 epochs = 20
 train_losses = []
 val_losses = []
-for epoch in range(1, 5000):
+for epoch in range(1, 100):
     loss = train(model)
     # acc = test(model, test_data, criterion)
     test_loss = test(model)
