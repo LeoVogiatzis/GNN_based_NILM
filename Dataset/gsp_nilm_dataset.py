@@ -57,11 +57,11 @@ class NilmDataset(Dataset):
         for raw_path in self.raw_paths:
             appliance = pd.read_csv(raw_path, index_col=0).reset_index()
             # appliance[raw_path[9:-4]]
-            main_val = appliance[raw_path[9:-4]].values  # get only readings
+            main_val = appliance['dishwaser_20'].values  # get only readings
             data_vec = main_val
             adjacency, drift = self._get_adjacency_info(data_vec)
             edge_indices = self._to_edge_index(adjacency)
-            node_feats = self._get_node_features(adjacency)
+            # node_feats = self._get_node_features(adjacency)
             # node_feats = np.asarray(drift)
             # node_feats = node_feats.reshape((-1, 1))
             # node_feats = torch.tensor(node_feats, dtype=torch.float)
@@ -70,7 +70,7 @@ class NilmDataset(Dataset):
             labels = torch.tensor(labels, dtype=torch.int64)
 
             data = Data(
-                x=node_feats,
+                # x=node_feats,
                 edge_index=edge_indices, y=labels
                 # , edge_attr=edge_feats
                 #  train_mask=[2000], test_mask=[2000]
@@ -112,7 +112,7 @@ class NilmDataset(Dataset):
         t0 = time.process_time()
         print("Hello")
         all_node_feats = []
-        G = nk.Graph(n=3872)
+        G = nk.Graph(adjacency.shape[0])
         for iy, ix in np.ndindex(adjacency.shape):
             if (iy != ix) and (adjacency[iy, ix] != 0):
                 G.addEdge(iy, ix)

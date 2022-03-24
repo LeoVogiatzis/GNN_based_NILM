@@ -1,5 +1,5 @@
 from Embeddings.Node2Vec import node_representations
-from Dataset import gsp_nilm_dataset
+from Dataset import gsp_nilm_dataset, gsp_dataset
 import torch_geometric
 
 # from Gnn_Models.model import GCN
@@ -38,7 +38,59 @@ class GCN(torch.nn.Module):
         return x
 
 
-def train(model):
+def graph_representation(data):
+    embedding_method = ''
+    if embedding_method == 'Node2Vec':
+        embeddings = node_representations(data)
+        data.x = embeddings.data
+
+    elif embedding_method == 'AE':
+        data = pairwise_auto_encoder(data)
+
+    else:
+        print(data.x)
+
+    data.y = data.y.type(torch.FloatTensor)
+    print(data.x)
+
+    return data
+
+
+def graph_energy_dissagregation(data):
+    transform = RandomLinkSplit(is_undirected=True)
+    train_data, val_data, test_data = transform(data)
+    print(train_data, val_data, test_data)
+
+    model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+    criterion = torch.nn.MSELoss()
+    epochs = 20
+    train_losses = []
+    val_losses = []
+    for epoch in range(1, 1000):
+        loss = train(model, optimizer, train_data, criterion)
+        # acc = test(model, test_data, criterion)
+        test_loss = test(model, test_data, criterion)
+        train_losses.append(loss.item())
+        val_losses.append(test_loss.item())
+        print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
+    print(model)
+    results = model(data.x, data.edge_index)
+    print(results)
+    plt.figure(figsize=(10, 5))
+    plt.title("Training and Validation Loss")
+    plt.plot(val_losses, label="val")
+    plt.plot(train_losses, label="train")
+    plt.xlabel("iterations")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.show()
+    print('End Pipeline')
+    return model
+
+
+def train(model, optimizer, train_data, criterion):
     model.train()
     optimizer.zero_grad()  # Clear gradients.
     # out = model(dataset.x, dataset.edge_index)  # Perform a single forward pass.
@@ -52,7 +104,7 @@ def train(model):
     return loss
 
 
-def test(model):
+def test(model, test_data, criterion):
     model.eval()
     out = model(test_data.x, test_data.edge_index)
     test_loss = criterion(out, test_data.y.view(-1, 1))
@@ -60,51 +112,110 @@ def test(model):
     return test_loss
 
 
-dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='mains_2.csv', window=20, sigma=20)
-data = dataset[0]
-print(data)
+def main(file):
+    dataset = gsp_nilm_dataset.NilmDataset(root='data', filename=f'{file}', window=20, sigma=20)
+    data = dataset[0]
+    print(data)
+    data = graph_representation(data)
+    model = graph_energy_dissagregation(data)
+    return model
 
-embedding_method = ''
-if embedding_method == 'Node2Vec':
-    embeddings = node_representations(data)
-    data.x = embeddings.data
 
-elif embedding_method == 'AE':
-    data = pairwise_auto_encoder(data)
+if __name__ == '__main__':
 
-else:
-    print(data.x)
+    import os
+    import re
+    files = os.listdir("data/raw/")
 
-data.y = data.y.type(torch.FloatTensor)
-print(data.x)
-
-transform = RandomLinkSplit(is_undirected=True)
-train_data, val_data, test_data = transform(data)
-print(train_data, val_data, test_data)
-
-model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-criterion = torch.nn.MSELoss()
-epochs = 20
-train_losses = []
-val_losses = []
-for epoch in range(1, 100):
-    loss = train(model)
-    # acc = test(model, test_data, criterion)
-    test_loss = test(model)
-    train_losses.append(loss.item())
-    val_losses.append(test_loss.item())
-    print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
-print(model)
-results = model(data.x, data.edge_index)
-print(results)
-plt.figure(figsize=(10, 5))
-plt.title("Training and Validation Loss")
-plt.plot(val_losses, label="val")
-plt.plot(train_losses, label="train")
-plt.xlabel("iterations")
-plt.ylabel("Loss")
-plt.legend()
-plt.show()
-print('End Pipeline')
+    for file in files:
+        filename = re.sub(r'\.csv$', '', file)
+        if file.startswith('air'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('bathroom'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('dishwaser'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('light'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('disposal'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('electric'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('electronics'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('kitchen'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('mains'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('out'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('micro'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('washer'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('stove'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('subpanel'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('refri'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('smoke'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith('stove'):
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')
+        elif file.startswith():
+            if os.path.exists(filename):
+                model = torch.load(f'{filename}.ckpt')
+            model = main(file)
+            torch.save(model, f'{file}.ckpt')

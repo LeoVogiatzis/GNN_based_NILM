@@ -62,7 +62,7 @@ class NilmDataset(Dataset):
         idx = 0
         for raw_path in self.raw_paths:
             appliance = pd.read_csv(raw_path).reset_index()
-            main_val = appliance['dishwaser_20'].values  # get only readings
+            main_val = appliance[f'{str(appliance.columns[1])}'].values  # get only readings
             data_vec = main_val
             adjacency, drift = self._get_adjacency_info(data_vec)
             edge_indices = self._to_edge_index(adjacency)
@@ -105,7 +105,7 @@ class NilmDataset(Dataset):
         t0 = time.process_time()
         print("Hello")
         all_node_feats = []
-        G = nk.Graph(n=3872)
+        G = nk.Graph(adjacency.shape[0])
         for iy, ix in np.ndindex(adjacency.shape):
             if (iy != ix) and (adjacency[iy, ix] != 0):
                 G.addEdge(iy, ix)
@@ -229,7 +229,7 @@ def test(model):
     return test_loss
 
 
-def conventional_ml():
+def conventional_ml(train_data):
     regr = RandomForestRegressor(n_estimators=10, random_state=0)
     regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
     from sklearn.metrics import mean_squared_error
@@ -248,14 +248,22 @@ print(data)
 #     data.x = degrees
 #     print(data)
 # data.x = degrees.reshape((-1, 1))
+
+
 data.y = data.y.type(torch.FloatTensor)
 
 transform = RandomLinkSplit(is_undirected=True)
 train_data, val_data, test_data = transform(data)
 print(train_data, val_data, test_data)
-
+# conventional_ml(train_data)
 model = GCN(in_channels=train_data.x.shape[1], hidden_channels=train_data.x.shape[1],
             out_channels=1)
+from utils import mse
+
+y_true = data.y.cpu().detach().numpy()
+y_hat = np.mean(y_true)
+print(mse(np.array([y_hat] * y_true.shape[0]), y_true))
+
 # model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 criterion = torch.nn.MSELoss()
@@ -278,4 +286,4 @@ plt.ylabel("Loss")
 plt.legend()
 plt.show()
 
-exit('test')
+# exit('test')
