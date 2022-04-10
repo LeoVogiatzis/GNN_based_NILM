@@ -68,14 +68,14 @@ def ground_truth(main_val, data):
         data_aggr.append(np.mean(main_val[int(np.floor(len(main_val) / window)) * window:]))
     delta_p = [np.round(data_aggr[i + 1] - data_aggr[i], 2) for i in range(0, len(data_aggr) - 1)]
     # freq_data = data.y.detach().numpy() / np.linalg.norm(data.y.detach().numpy())
-    freq_data = delta_p / np.linalg.norm(delta_p)
+    # freq_data = delta_p / np.linalg.norm(delta_p)
     plt.figure(figsize=(10, 5))
     plt.title("Consumption")
     # plt.plot(val_losses, label="val")
     print(data.y.detach().numpy())
     plt.plot(list(data.y.detach().numpy()), label="fourier_transform")
     plt.show()
-    plt.plot(freq_data, label="ground_truth")
+    plt.plot(delta_p, label="ground_truth")
     plt.xlabel("time")
     plt.ylabel("power_con")
     plt.legend()
@@ -84,14 +84,55 @@ def ground_truth(main_val, data):
     return data_aggr
 
 
-def conventional_ml(train_data):
-    regr = RandomForestRegressor(n_estimators=10, random_state=0)
-    regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
-    from sklearn.metrics import mean_squared_error
+def evaluate(model, test_features, test_labels):
+    predictions = model.predict(test_features)
+    errors = abs(predictions - test_labels)
+    mape = 100 * np.mean(errors / test_labels)
+    accuracy = 100 - mape
+    print('Model Performance')
+    print('Average Error: {:0.4f} degrees.'.format(np.mean(errors)))
+    print('Accuracy = {:0.2f}%.'.format(accuracy))
 
-    mse = mean_squared_error(np.array(train_data.y), regr.predict(np.array(train_data.x)).reshape(-1, 1))
-    print(mse)
-    return regr.predict(np.array(train_data.x)).reshape(-1)
+    return accuracy
+
+
+def conventional_ml(train_data, test_data):
+    param_grid = {
+        'bootstrap': [True],
+        'max_depth': [80, 90, 100, 110],
+        'max_features': [2, 3],
+        'min_samples_leaf': [3, 4, 5],
+        'min_samples_split': [8, 10, 12],
+        'n_estimators': [100, 200, 300, 1000]
+    }
+
+    from sklearn.model_selection import GridSearchCV
+    from sklearn.metrics import mean_squared_error
+    import warnings
+    base_model = RandomForestRegressor(n_estimators=10, random_state=42)
+    base_model.fit(np.array(train_data.x), np.array(train_data.y).ravel())
+    base_accuracy = evaluate(base_model, np.array(test_data.x), np.array(test_data.y).ravel())
+    regr = RandomForestRegressor(random_state=0)
+
+    CV_regr = GridSearchCV(estimator=regr, param_grid=param_grid,
+                           cv=5, n_jobs=-1, verbose=2, return_train_score=True)
+
+    with warnings.catch_warnings(record=True) as w:
+        try:
+            CV_regr.fit(np.array(train_data.x),
+                        np.array(train_data.y).ravel())
+        except ValueError:
+            pass
+        # print(repr(w[-1].message))
+
+    # CV_regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
+    print(CV_regr.best_params_)
+    best_grid = CV_regr.best_estimator_
+    grid_accuracy = evaluate(best_grid, np.array(test_data.x), np.array(test_data.y).ravel())
+    print('Improvement of {:0.2f}%.'.format(100 * (grid_accuracy - base_accuracy) / base_accuracy))
+    # mse = mean_squared_error(np.array(train_data.y), regr.predict(np.array(train_data.x)))  # .reshape(-1, 1)
+    # print(mse)
+    return best_grid.predict(np.array(train_data.x)).reshape(-1)
 
 
 # df = pd.read_csv('/home/leonidas/PycharmProjects/GNN_based_NILM/data/raw/sample_house2.csv',
@@ -148,7 +189,7 @@ for filename in all_files:
     train_data, val_data, test_data = transform(data)
     print(train_data, val_data, test_data)
 
-    pred = conventional_ml(train_data)
+    pred = conventional_ml(train_data, test_data)
 
     plt.title("Predicted/ G-truth")
     plt.plot(pred, label="pred")
@@ -158,48 +199,49 @@ for filename in all_files:
     plt.legend()
     plt.show()
     exit()
-
-    from utils import mse
-
-    y_true = data.y.cpu().detach().numpy()
-    y_hat = np.mean(y_true)
-    print(mse(np.array([y_hat] * y_true.shape[0]), y_true))
-
-    # exit('By Marinos')
-    model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-    criterion = torch.nn.MSELoss()
-    epochs = 20
-    train_losses = []
-    val_losses = []
-    print(np.unique(data.y.view(-1, 1)))
-
-    for epoch in range(1, 10):
-        loss = train(model)
-        # acc = test(model, test_data, criterion)
-        test_loss = test(model)
-        train_losses.append(loss.item())
-        val_losses.append(test_loss.item())
-        print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
-    print(model)
-    results = model(data.x, data.edge_index)
-    results = results.detach().numpy().reshape(-1)
-    print(results)
-    plt.title("Predicted/ G-truth")
-    plt.plot(results, label="pred")
-    plt.plot(data.y.view(-1, 1), label="g_truth")
-    plt.xlabel("timestep")
-    plt.ylabel("delta_p")
-    plt.legend()
-    plt.show()
-
-    plt.figure(figsize=(10, 5))
-    plt.title("Training and Validation Loss")
-    plt.plot(val_losses, label="val")
-    plt.plot(train_losses, label="train")
-    plt.xlabel("iterations")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.show()
-    print('End Pipeline')
+    # exit()
+    #
+    # from utils import mse
+    #
+    # y_true = data.y.cpu().detach().numpy()
+    # y_hat = np.mean(y_true)
+    # print(mse(np.array([y_hat] * y_true.shape[0]), y_true))
+    #
+    # # exit('By Marinos')
+    # model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
+    #
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+    # criterion = torch.nn.MSELoss()
+    # epochs = 20
+    # train_losses = []
+    # val_losses = []
+    # print(np.unique(data.y.view(-1, 1)))
+    #
+    # for epoch in range(1, 100):
+    #     loss = train(model)
+    #     # acc = test(model, test_data, criterion)
+    #     test_loss = test(model)
+    #     train_losses.append(loss.item())
+    #     val_losses.append(test_loss.item())
+    #     print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
+    # print(model)
+    # results = model(data.x, data.edge_index)
+    # results = results.detach().numpy().reshape(-1)
+    # print(results)
+    # plt.title("Predicted/ G-truth")
+    # plt.plot(results, label="pred")
+    # plt.plot(data.y.view(-1, 1), label="g_truth",  alpha=0.5)
+    # plt.xlabel("timestep")
+    # plt.ylabel("delta_p")
+    # plt.legend()
+    # plt.show()
+    #
+    # plt.figure(figsize=(10, 5))
+    # plt.title("Training and Validation Loss")
+    # plt.plot(val_losses, label="val")
+    # plt.plot(train_losses, label="train")
+    # plt.xlabel("iterations")
+    # plt.ylabel("Loss")
+    # plt.legend()
+    # plt.show()
+    # print('End Pipeline')
