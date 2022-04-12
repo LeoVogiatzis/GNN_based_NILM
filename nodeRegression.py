@@ -107,11 +107,10 @@ def conventional_ml(train_data, test_data):
     }
 
     from sklearn.model_selection import GridSearchCV
-    from sklearn.metrics import mean_squared_error
     import warnings
     base_model = RandomForestRegressor(n_estimators=10, random_state=42)
-    base_model.fit(np.array(train_data.x), np.array(train_data.y).ravel())
-    base_accuracy = evaluate(base_model, np.array(test_data.x), np.array(test_data.y).ravel())
+    base_model.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
+    base_accuracy = evaluate(base_model, train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
     regr = RandomForestRegressor(random_state=0)
 
     CV_regr = GridSearchCV(estimator=regr, param_grid=param_grid,
@@ -119,8 +118,7 @@ def conventional_ml(train_data, test_data):
 
     with warnings.catch_warnings(record=True) as w:
         try:
-            CV_regr.fit(np.array(train_data.x),
-                        np.array(train_data.y).ravel())
+            CV_regr.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
         except ValueError:
             pass
         # print(repr(w[-1].message))
@@ -128,11 +126,11 @@ def conventional_ml(train_data, test_data):
     # CV_regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
     print(CV_regr.best_params_)
     best_grid = CV_regr.best_estimator_
-    grid_accuracy = evaluate(best_grid, np.array(test_data.x), np.array(test_data.y).ravel())
+    grid_accuracy = evaluate(best_grid, train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
     print('Improvement of {:0.2f}%.'.format(100 * (grid_accuracy - base_accuracy) / base_accuracy))
     # mse = mean_squared_error(np.array(train_data.y), regr.predict(np.array(train_data.x)))  # .reshape(-1, 1)
     # print(mse)
-    return best_grid.predict(np.array(train_data.x)).reshape(-1)
+    return best_grid.predict(test_data.x.detach().numpy()).reshape(-1)
 
 
 # df = pd.read_csv('/home/leonidas/PycharmProjects/GNN_based_NILM/data/raw/sample_house2.csv',
@@ -169,14 +167,13 @@ for filename in all_files:
     data = dataset[index]
     print(data)
 
-    embedding_method = ''
+    embedding_method = 'AE'
     if embedding_method == 'Node2Vec':
         embeddings = node_representations(data)
         data.x = embeddings.data
 
     elif embedding_method == 'AE':
         data = pairwise_auto_encoder(data)
-
     else:
         print(data.x)
 
@@ -198,7 +195,7 @@ for filename in all_files:
     plt.ylabel("delta_p")
     plt.legend()
     plt.show()
-    exit()
+    # exit()
     # exit()
     #
     # from utils import mse
