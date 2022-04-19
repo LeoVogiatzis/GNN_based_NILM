@@ -9,10 +9,11 @@ def mae(prediction, true):
 
 
 def mse(prediction, true):
-    MSE = (true - prediction)**2
+    MSE = (true - prediction) ** 2
     MSE = np.sum(MSE)
     MSE = MSE / len(prediction)
     return MSE
+
 
 def sae(prediction, true, N):
     T = len(prediction)
@@ -36,6 +37,3 @@ def normalize_data(data, min_value=0.0, max_value=1.0):
     data -= min_value
     data /= max_value - min_value
     return data
-
-
-
