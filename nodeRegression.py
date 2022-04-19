@@ -13,6 +13,7 @@ from torch_geometric.transforms import RandomLinkSplit
 from Dataset import gsp_dataset
 from Embeddings.Auto_Encoder import pairwise_auto_encoder
 from Embeddings.Node2Vec import node_representations
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
 class GCN(torch.nn.Module):
@@ -99,18 +100,19 @@ def evaluate(model, test_features, test_labels):
 def conventional_ml(train_data, test_data):
     param_grid = {
         'bootstrap': [True],
-        'max_depth': [80, 90, 100, 110],
-        'max_features': [2, 3],
+        'max_depth': [3, 6, 9, 12, 16, 30, 50, 80, 90, 100, 110],
+        'max_samples': [0.5, 0.75, 0.95],
+        'max_features': [2, 3, 4],
         'min_samples_leaf': [3, 4, 5],
         'min_samples_split': [8, 10, 12],
-        'n_estimators': [100, 200, 300, 1000]
+        'n_estimators': [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     }
 
     from sklearn.model_selection import GridSearchCV
     import warnings
     base_model = RandomForestRegressor(n_estimators=10, random_state=42)
-    base_model.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
-    base_accuracy = evaluate(base_model, train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
+    base_model.fit(np.array(train_data.x), np.array(train_data.y).ravel())
+    base_accuracy = evaluate(base_model, np.array(train_data.x), np.array(train_data.y).ravel())
     regr = RandomForestRegressor(random_state=0)
 
     CV_regr = GridSearchCV(estimator=regr, param_grid=param_grid,
@@ -118,18 +120,22 @@ def conventional_ml(train_data, test_data):
 
     with warnings.catch_warnings(record=True) as w:
         try:
-            CV_regr.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
+            CV_regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
         except ValueError:
             pass
         # print(repr(w[-1].message))
-
+    # train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel()
     # CV_regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
     print(CV_regr.best_params_)
     best_grid = CV_regr.best_estimator_
-    grid_accuracy = evaluate(best_grid, train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
+    grid_accuracy = evaluate(best_grid, np.array(train_data.x), np.array(train_data.y).ravel())
     print('Improvement of {:0.2f}%.'.format(100 * (grid_accuracy - base_accuracy) / base_accuracy))
-    # mse = mean_squared_error(np.array(train_data.y), regr.predict(np.array(train_data.x)))  # .reshape(-1, 1)
-    # print(mse)
+
+    mse = mean_squared_error(np.array(test_data.y), best_grid.predict(np.array(test_data.x)))  # .reshape(-1, 1)
+    mae = mean_absolute_error(np.array(test_data.y), best_grid.predict(np.array(test_data.x)))
+    print(mse)
+    print(mae)
+    print(best_grid)
     return best_grid.predict(test_data.x.detach().numpy()).reshape(-1)
 
 
@@ -159,15 +165,16 @@ houses = [filename for filename in all_files]
 # appliance = pd.read_csv('/home/leonidas/PycharmProjects/GNN_based_NILM/data/raw/lighting_23.csv', index_col=0)
 # main_val = appliance['lighting_23'].values
 
+x = 1
 index = 0
 for filename in all_files:
     dataset = gsp_dataset.NilmDataset(root='data', filename=f'{filename}', window=20, sigma=20)
-    if index > 0:
-        index += 1
-    data = dataset[index]
+    # if index > 0:
+    #     index += 1
+    data = dataset[0]
     print(data)
 
-    embedding_method = 'AE'
+    embedding_method = ''
     if embedding_method == 'Node2Vec':
         embeddings = node_representations(data)
         data.x = embeddings.data
@@ -186,15 +193,19 @@ for filename in all_files:
     train_data, val_data, test_data = transform(data)
     print(train_data, val_data, test_data)
 
-    pred = conventional_ml(train_data, test_data)
+    torch.save(data, f'{index}.pt')
+    index += 1
+    # pred = conventional_ml(train_data, test_data)
+    #
+    # plt.title("Predicted/ G-truth")
+    # plt.plot(pred, label="pred")
+    # plt.plot(test_data.y.view(-1, 1), label="g_truth", alpha=0.5)
+    # plt.xlabel("timestep")
+    # plt.ylabel("delta_p")
+    # plt.legend()
+    # plt.show()
 
-    plt.title("Predicted/ G-truth")
-    plt.plot(pred, label="pred")
-    plt.plot(data.y.view(-1, 1), label="g_truth", alpha=0.5)
-    plt.xlabel("timestep")
-    plt.ylabel("delta_p")
-    plt.legend()
-    plt.show()
+    # print('End Pip
     # exit()
     # exit()
     #
@@ -214,7 +225,7 @@ for filename in all_files:
     # val_losses = []
     # print(np.unique(data.y.view(-1, 1)))
     #
-    # for epoch in range(1, 100):
+    # for epoch in range(1, 10):
     #     loss = train(model)
     #     # acc = test(model, test_data, criterion)
     #     test_loss = test(model)
