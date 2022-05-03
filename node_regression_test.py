@@ -60,7 +60,7 @@ def test(model, test_data, criterion):
 
 
 def main():
-    dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
+    dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='lighting_house_2.csv', window=20, sigma=20)
     data = dataset[0]
     print(data)
     # degrees = torch_geometric.utils.degree(data.edge_index[0])

@@ -60,7 +60,7 @@ class NilmDataset(Dataset):
             appliance = pd.read_csv(raw_path, index_col=0).reset_index()
             # appliance = appliance.rolling(10).mean().dropna()
             # appliance[raw_path[9:-4]]
-            main_val = appliance[raw_path[55:-4]].values  # get only readings
+            main_val = appliance['lighting_house_2'].values  # get only readings
             data_vec = main_val
             adjacency, drift = self._get_adjacency_info(data_vec)
             edge_indices = self._to_edge_index(adjacency)
@@ -183,7 +183,7 @@ class NilmDataset(Dataset):
         plt.hist(Am.reshape(-1), bins=100)
         # plt.yscale('log')
         plt.show()
-        Am = np.where(Am > 0.98, 0, 1)
+        Am = np.where(Am > 0.7, 0, 1)
         print(np.count_nonzero(Am))
         Am[Am != 0]
         print(np.count_nonzero(Am))
@@ -216,15 +216,20 @@ class NilmDataset(Dataset):
             data = torch.load(os.path.join(self.processed_dir, f'data_{idx}.pt'))
         return data
 
-# def main():
-#     dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
-#     data = dataset[0]
-#     # G = to_networkx(data)
-#     degrees = torch_geometric.utils.degree(data.edge_index[0])
-#     n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
-#     data.x = degrees
-#     print(data)
 
-#
-# if __name__ == '__main__':
-#     main()
+def main():
+    import os
+    # exit(os.getcwd())
+    dataset = NilmDataset(root='../data', filename='lighting_house_2.csv', window=20, sigma=20)
+    data = dataset[0]
+    torch.save(data, '../data/processed/lightning.pt')
+    exit()
+    # G = to_networkx(data)
+    degrees = torch_geometric.utils.degree(data.edge_index[0])
+    n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
+    data.x = degrees
+    print(data)
+
+
+if __name__ == '__main__':
+    main()
