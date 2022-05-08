@@ -60,7 +60,7 @@ class NilmDataset(Dataset):
             appliance = pd.read_csv(raw_path, index_col=0).reset_index()
             # appliance = appliance.rolling(10).mean().dropna()
             # appliance[raw_path[9:-4]]
-            main_val = appliance['lighting_house_2'].values  # get only readings
+            main_val = appliance[f'{appliance.columns[0]}'].values  # get only readings
             data_vec = main_val
             adjacency, drift = self._get_adjacency_info(data_vec)
             edge_indices = self._to_edge_index(adjacency)
@@ -183,7 +183,7 @@ class NilmDataset(Dataset):
         plt.hist(Am.reshape(-1), bins=100)
         # plt.yscale('log')
         plt.show()
-        Am = np.where(Am > 0.7, 0, 1)
+        Am = np.where(Am > 0.98, 0, 1)
         print(np.count_nonzero(Am))
         Am[Am != 0]
         print(np.count_nonzero(Am))
@@ -220,9 +220,9 @@ class NilmDataset(Dataset):
 def main():
     import os
     # exit(os.getcwd())
-    dataset = NilmDataset(root='../data', filename='lighting_house_2.csv', window=20, sigma=20)
+    dataset = NilmDataset(root='../data', filename='dishwasher.csv', window=20, sigma=20)
     data = dataset[0]
-    torch.save(data, '../data/processed/lightning.pt')
+    torch.save(data, '../data/processed/dishwasher.pt')
     exit()
     # G = to_networkx(data)
     degrees = torch_geometric.utils.degree(data.edge_index[0])

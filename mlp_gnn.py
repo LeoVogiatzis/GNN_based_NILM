@@ -41,7 +41,7 @@ def test():
     return test_acc
 
 
-data = torch.load('data/processed/0.pt')
+data = torch.load('data/processed/washer_dryer_house_5_x.pt')
 data.num_classes = len(data.y.unique())
 print(f'Dataset: {data}:')
 print('======================')
@@ -77,6 +77,6 @@ criterion = torch.nn.MSELoss()  # Define loss criterion.
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)  # Define optimizer.
 data.y = data.y.type(torch.LongTensor)
 
-for epoch in range(1, 10000):
+for epoch in range(1, 100):
     loss = train()
     print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}')

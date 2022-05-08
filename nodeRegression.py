@@ -16,24 +16,41 @@ from Embeddings.Node2Vec import node_representations
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
-class GCN(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels):
-        super(GCN, self).__init__()
-        torch.manual_seed(42)
+# class GCN(torch.nn.Module):
+#     def __init__(self, in_channels, hidden_channels, out_channels):
+#         super(GCN, self).__init__()
+#         torch.manual_seed(42)
+#
+#         # Initialize the layers
+#         self.conv1 = GCNConv(in_channels, hidden_channels)
+#         self.conv2 = GCNConv(hidden_channels, out_channels)
+#
+#     def forward(self, x, edge_index):
+#         # First Message Passing Layer (Transformation)
+#         x = self.conv1(x, edge_index)
+#         x = x.relu()
+#         x = F.dropout(x, p=0.5, training=self.training)
+#
+#         # Second Message Passing Layer
+#         x = self.conv2(x, edge_index)
+#
+#         return x
 
-        # Initialize the layers
-        self.conv1 = GCNConv(in_channels, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, out_channels)
+
+class GCN(torch.nn.Module):
+    def __init__(self, hidden_channels):
+        super(GCN, self).__init__()
+        torch.manual_seed(12345)
+        self.conv1 = GCNConv(train_data.num_features, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, 100)
+        self.linear1 = torch.nn.Linear(100, 1)
 
     def forward(self, x, edge_index):
-        # First Message Passing Layer (Transformation)
         x = self.conv1(x, edge_index)
         x = x.relu()
         x = F.dropout(x, p=0.5, training=self.training)
-
-        # Second Message Passing Layer
         x = self.conv2(x, edge_index)
-
+        x = self.linear1(x)
         return x
 
 
@@ -45,7 +62,7 @@ def train(model):
     print(out)
     print(train_data.y)
     # loss = criterion(out[dataset.train_mask], dataset.y[dataset.train_mask])  # Compute the loss solely based on the training nodes.
-    loss = criterion(out, train_data.y.view(-1, 1))
+    loss = criterion(out.squeeze(), train_data.y.squeeze()) # view(-1, 1))
     loss.backward(retain_graph=True)  # Derive gradients.
     optimizer.step()  # Update parameters based on gradients.
     return loss
@@ -153,10 +170,12 @@ all_files = glob.glob(path + "/*.pt")
 devices = [filename for filename in all_files]
 index = 0
 for filename in all_files:
-    # if not filename.__contains__('1'):
+    # if not filename.__contains__('dishwasher'):
     #     continue
     data = torch.load(f'{filename}')
-
+    print('-------------------------------------------------------------------')
+    print(filename.split('/')[-1].strip('.csv'))
+    data.num_classes = len(data.y.unique())
     embedding_method = ''
     if embedding_method == 'Node2Vec':
         embeddings = node_representations(data)
@@ -199,16 +218,16 @@ for filename in all_files:
     print(mse(np.array([y_hat] * y_true.shape[0]), y_true))
 
     # exit('By Marinos')
-    model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
+    model = GCN(hidden_channels=4)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=5e-4)
     criterion = torch.nn.MSELoss()
     epochs = 20
     train_losses = []
     val_losses = []
     print(np.unique(data.y.view(-1, 1)))
 
-    for epoch in range(1, 5):
+    for epoch in range(1, 50):
         loss = train(model)
         # acc = test(model, test_data, criterion)
         test_loss = test(model)
@@ -216,12 +235,14 @@ for filename in all_files:
         val_losses.append(test_loss.item())
         print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
     print(model)
+
     results = model(data.x, data.edge_index)
     results = results.detach().numpy().reshape(-1)
     print(results)
-    plt.title("Predicted/ G-truth")
+    # plt.title("Predicted/ G-truth")
     plt.plot(results, label="pred")
-    plt.plot(data.y.view(-1, 1), label="g_truth",  alpha=0.5)
+    plt.plot(data.y.view(-1, 1), label="g_truth", alpha=0.5)
+    plt.title(filename.split('/')[-1].strip('.csv'))
     plt.xlabel("timestep")
     plt.ylabel("delta_p")
     plt.legend()
@@ -235,4 +256,4 @@ for filename in all_files:
     plt.ylabel("Loss")
     plt.legend()
     plt.show()
-    print('End Pipeline')
+    print('------------------------------End Pipeline-----------------------------')
