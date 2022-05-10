@@ -196,33 +196,33 @@ for filename in all_files:
     train_data, val_data, test_data = transform(data)
     print(train_data, val_data, test_data)
     index += 1
-    pred = conventional_ml(train_data, test_data)
-
-    plt.title("Predicted/ G-truth")
-    plt.plot(pred, label="pred")
-    plt.plot(test_data.y.view(-1, 1), label="g_truth", alpha=0.5)
-    plt.title(str(index))
-    plt.xlabel("timestep")
-    plt.ylabel("delta_p")
-    plt.legend()
-    plt.show()
-    from utils import mse
-    print(mse(np.array(test_data.y.view(-1, 1)), pred))
-    continue
+    # pred = conventional_ml(train_data, test_data)
+    #
+    # plt.title("Predicted/ G-truth")
+    # plt.plot(pred, label="pred")
+    # plt.plot(test_data.y.view(-1, 1), label="g_truth", alpha=0.5)
+    # plt.title(str(index))
+    # plt.xlabel("timestep")
+    # plt.ylabel("delta_p")
+    # plt.legend()
+    # plt.show()
+    # from utils import mse
+    # print(mse(np.array(test_data.y.view(-1, 1)), pred))
+    # continue
     # print('End Pip
     # exit()
     # exit()
     #
 
-
+    from utils import mse
     y_true = data.y.cpu().detach().numpy()
     y_hat = np.mean(y_true)
-    print(mse(np.array(test_data.y), pred))
+    print(mse(np.array([y_hat] * y_true.shape[0]), y_true))
 
     # exit('By Marinos')
     model = GCN(hidden_channels=4)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=5e-4)
     criterion = torch.nn.MSELoss()
     epochs = 20
     train_losses = []

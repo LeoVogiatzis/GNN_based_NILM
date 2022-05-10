@@ -60,6 +60,7 @@ class NilmDataset(Dataset):
             appliance = pd.read_csv(raw_path, index_col=0).reset_index()
             # appliance = appliance.rolling(10).mean().dropna()
             # appliance[raw_path[9:-4]]
+            print(f'{appliance.columns[0]}')
             main_val = appliance[f'{appliance.columns[0]}'].values  # get only readings
             data_vec = main_val
             adjacency, drift = self._get_adjacency_info(data_vec)
@@ -185,7 +186,7 @@ class NilmDataset(Dataset):
         plt.show()
         Am = np.where(Am > 0.98, 0, 1)
         print(np.count_nonzero(Am))
-        Am[Am != 0]
+        # Am = Am[Am != 0]
         print(np.count_nonzero(Am))
         # exit('Test')
         return Am, delta_p
