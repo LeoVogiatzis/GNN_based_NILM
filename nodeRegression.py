@@ -16,42 +16,42 @@ from Embeddings.Node2Vec import node_representations
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
-# class GCN(torch.nn.Module):
-#     def __init__(self, in_channels, hidden_channels, out_channels):
-#         super(GCN, self).__init__()
-#         torch.manual_seed(42)
-#
-#         # Initialize the layers
-#         self.conv1 = GCNConv(in_channels, hidden_channels)
-#         self.conv2 = GCNConv(hidden_channels, out_channels)
-#
-#     def forward(self, x, edge_index):
-#         # First Message Passing Layer (Transformation)
-#         x = self.conv1(x, edge_index)
-#         x = x.relu()
-#         x = F.dropout(x, p=0.5, training=self.training)
-#
-#         # Second Message Passing Layer
-#         x = self.conv2(x, edge_index)
-#
-#         return x
-
-
 class GCN(torch.nn.Module):
-    def __init__(self, hidden_channels):
+    def __init__(self, in_channels, hidden_channels, out_channels):
         super(GCN, self).__init__()
-        torch.manual_seed(12345)
-        self.conv1 = GCNConv(train_data.num_features, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, 100)
-        self.linear1 = torch.nn.Linear(100, 1)
+        torch.manual_seed(42)
+
+        # Initialize the layers
+        self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, out_channels)
 
     def forward(self, x, edge_index):
+        # First Message Passing Layer (Transformation)
         x = self.conv1(x, edge_index)
         x = x.relu()
         x = F.dropout(x, p=0.5, training=self.training)
+
+        # Second Message Passing Layer
         x = self.conv2(x, edge_index)
-        x = self.linear1(x)
+
         return x
+
+
+# class GCN(torch.nn.Module):
+#     def __init__(self, hidden_channels):
+#         super(GCN, self).__init__()
+#         torch.manual_seed(12345)
+#         self.conv1 = GCNConv(train_data.num_features, hidden_channels)
+#         self.conv2 = GCNConv(hidden_channels, 100)
+#         self.linear1 = torch.nn.Linear(100, 1)
+#
+#     def forward(self, x, edge_index):
+#         x = self.conv1(x, edge_index)
+#         x = x.relu()
+#         x = F.dropout(x, p=0.5, training=self.training)
+#         x = self.conv2(x, edge_index)
+#         x = self.linear1(x)
+#         return x
 
 
 def train(model):
@@ -136,8 +136,8 @@ def conventional_ml(train_data, test_data):
     from sklearn.model_selection import GridSearchCV
     import warnings
     base_model = RandomForestRegressor(n_estimators=10, random_state=42)
-    base_model.fit(np.array(train_data.x), np.array(train_data.y).ravel())
-    base_accuracy = evaluate(base_model, np.array(train_data.x), np.array(train_data.y).ravel())
+    base_model.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
+    base_accuracy = evaluate(base_model, train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
     regr = RandomForestRegressor(random_state=0)
 
     CV_regr = GridSearchCV(estimator=regr, param_grid=param_grid,
@@ -145,7 +145,7 @@ def conventional_ml(train_data, test_data):
 
     with warnings.catch_warnings(record=True) as w:
         try:
-            CV_regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
+            CV_regr.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
         except ValueError:
             pass
         # print(repr(w[-1].message))
@@ -154,11 +154,11 @@ def conventional_ml(train_data, test_data):
     print(f'best parameters: {CV_regr.best_params_}')
     best_grid = CV_regr.best_estimator_
 
-    grid_accuracy = evaluate(best_grid, np.array(train_data.x), np.array(train_data.y).ravel())
+    grid_accuracy = evaluate(best_grid, test_data.x.detach().numpy(), test_data.y.detach().numpy().ravel())
     print('Improvement of {:0.2f}%.'.format(100 * (grid_accuracy - base_accuracy) / base_accuracy))
 
-    mse = mean_squared_error(np.array(test_data.y), best_grid.predict(np.array(test_data.x)))  # .reshape(-1, 1)
-    mae = mean_absolute_error(np.array(test_data.y), best_grid.predict(np.array(test_data.x)))
+    mse = mean_squared_error(np.array(test_data.y.detach().numpy().ravel()), best_grid.predict(test_data.x.detach().numpy()))  # .reshape(-1, 1)
+    mae = mean_absolute_error(test_data.y.detach().numpy().ravel(), best_grid.predict(test_data.x.detach().numpy()))
     print(f'best_estimator {best_grid}')
     print(f'mse: {mse}')
     print(f'mae: {mae}')
@@ -176,7 +176,7 @@ for filename in all_files:
     print('-------------------------------------------------------------------')
     print(filename.split('/')[-1].strip('.csv'))
     data.num_classes = len(data.y.unique())
-    embedding_method = ''
+    embedding_method = 'AE'
     if embedding_method == 'Node2Vec':
         embeddings = node_representations(data)
         data.x = embeddings.data
@@ -220,7 +220,7 @@ for filename in all_files:
     print(mse(np.array([y_hat] * y_true.shape[0]), y_true))
 
     # exit('By Marinos')
-    model = GCN(hidden_channels=4)
+    model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=5e-4)
     criterion = torch.nn.MSELoss()
