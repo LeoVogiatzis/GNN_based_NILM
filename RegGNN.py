@@ -1,31 +1,49 @@
+'''RegGNN regression model architecture.
+torch_geometric needs to be installed.
+'''
+
 import torch
-from torch.nn import Linear
+import torch.nn as nn
 import torch.nn.functional as F
+from torch_geometric.nn.dense import DenseGCNConv
+
+from torch.nn import Linear
 from torch_geometric.transforms import RandomLinkSplit
 
 
-class MLP(torch.nn.Module):
-    def __init__(self, hidden_channels):
-        super().__init__()
-        torch.manual_seed(12345)
-        self.lin1 = Linear(data.num_features, hidden_channels)
-        self.lin2 = Linear(hidden_channels, 1)
+class RegGNN(nn.Module):
+    '''Regression using a DenseGCNConv layer from pytorch geometric.
+       Layers in this model are identical to GCNConv.
+    '''
 
-    def forward(self, x):
-        x = self.lin1(x)
-        x = x.relu()
-        x = F.dropout(x, p=0.1, training=self.training)
-        x = self.lin2(x)
-        return x
+    def __init__(self, nfeat, nhid, nclass, dropout):
+        super(RegGNN, self).__init__()
+
+        self.gc1 = DenseGCNConv(nfeat, nhid)
+        self.gc2 = DenseGCNConv(nhid, 1)
+        self.dropout = dropout
+        self.LinearLayer = nn.Linear(nclass, 1)
+
+    def forward(self, x, edge_index):
+        x = F.relu(self.gc1(x, edge_index))
+
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = self.gc2(x, edge_index)
+        x = self.LinearLayer(torch.transpose(x, 2, 1))
+
+        return torch.transpose(x, 2, 1)
+
+    def loss(self, pred, score):
+        return F.mse_loss(pred, score)
 
 
 def train():
     model.train()
     optimizer.zero_grad()  # Clear gradients.
-    out = model(data.x)  # Perform a single forward pass.
+    out = model(data.x, data.edge_index)  # Perform a single forward pass.
     # loss = criterion(out[data.train_mask],
     #                  data.y[data.train_mask])
-    loss = criterion(out, train_data.y.view(-1, 1))
+    loss = criterion(out.squeeze(), train_data.y.squeeze())
     # Compute the loss solely based on the training nodes.
     loss.backward()  # Derive gradients.
     optimizer.step()  # Update parameters based on gradients.
@@ -41,7 +59,7 @@ def test():
     return test_acc
 
 
-data = torch.load('data/median_filtering_Min_Max/kitchen_outlets_house_2_x.pt')
+data = torch.load('data/processed/kitchen_outlets_house_2_x.pt')
 data.num_classes = len(data.y.unique())
 print(f'Dataset: {data}:')
 print('======================')
@@ -69,14 +87,22 @@ transform = RandomLinkSplit(is_undirected=True)
 train_data, val_data, test_data = transform(data)
 print(train_data, val_data, test_data)
 
-model = MLP(hidden_channels=train_data.num_nodes)
+bat_size = 3
+train_ldr = torch.utils.data.DataLoader(train_data,
+                                        batch_size=bat_size, shuffle=True)
+val_data = torch.utils.data.DataLoader(val_data,
+                                       batch_size=bat_size, shuffle=True)
+test_data = torch.utils.data.DataLoader(test_data,
+                                        batch_size=bat_size, shuffle=True)
+
+model = RegGNN(nfeat=4, nhid=4, nclass=data.num_classes, dropout=0.1)
 print(model)
 
 # model = MLP(hidden_channels=16)
 criterion = torch.nn.MSELoss()  # Define loss criterion.
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)  # Define optimizer.
-data.y = data.y.type(torch.LongTensor)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)  # Define optimizer.
+data.y = data.y.type(torch.FloatTensor)
 
-for epoch in range(1, 1000):
+for epoch in range(1, 100):
     loss = train()
     print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}')

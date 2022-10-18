@@ -265,7 +265,7 @@ def pairwise_auto_encoder(data):
     print(train_data, val_data, test_data)
     # ------------------------------------------------------------------------------------
     model = GAE([data.x.shape[1], data.x.shape[1]], dropout=0.2)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     criterion = torch.nn.MSELoss()
 
     for i in range(epochs):

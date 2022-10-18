@@ -182,11 +182,11 @@ class NilmDataset(Dataset):
             for j in range(0, Am.shape[1]):
                 Am[i, j] = math.exp(-((delta_p[i] - delta_p[j]) / self.sigma) ** 2)
         plt.hist(Am.reshape(-1), bins=100)
-        # plt.yscale('log')
+        plt.yscale('log')
         plt.show()
         Am = np.where(Am > 0.98, 0, 1)
         print(np.count_nonzero(Am))
-        # Am = Am[Am != 0]
+        Am[Am != 0]
         print(np.count_nonzero(Am))
         # exit('Test')
         return Am, delta_p
@@ -201,7 +201,7 @@ class NilmDataset(Dataset):
 
         edge_indices = torch.tensor(edge_indices)
         edge_indices = edge_indices.t().to(torch.long).view(2, -1)
-
+        # edge_indices = edge_indices.nonzero(as_tuple=False).t().to(torch.long).view(2, -1)
         return edge_indices
 
     def len(self):
@@ -218,19 +218,20 @@ class NilmDataset(Dataset):
         return data
 
 
-def main():
-    import os
-    # exit(os.getcwd())
-    dataset = NilmDataset(root='../data', filename='dishwasher.csv', window=20, sigma=20)
-    data = dataset[0]
-    torch.save(data, '../data/processed/dishwasher.pt')
-    exit()
-    # G = to_networkx(data)
-    degrees = torch_geometric.utils.degree(data.edge_index[0])
-    n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
-    data.x = degrees
-    print(data)
+# def main():
+#     import os
+#     # exit(os.getcwd())
+#     dataset = NilmDataset(root='../data', filename='mains_2_house5.csv', window=20, sigma=20)
+#     data = dataset[0]
+#     exit()
+#     torch.save(data, '../data/processed/dishwasher.pt')
+#     exit()
+#     # G = to_networkx(data)
+#     degrees = torch_geometric.utils.degree(data.edge_index[0])
+#     n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
+#     data.x = degrees
+#     print(data)
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()

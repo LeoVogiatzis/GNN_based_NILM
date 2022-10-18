@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric_temporal.nn.recurrent import A3TGCN2
 from Embeddings.Node2Vec import node_representations
-from Dataset import gsp_nilm_dataset
+from Dataset import gsp_dataset
 import seaborn as sns
 from torch_geometric.transforms import RandomLinkSplit, RandomNodeSplit
 import matplotlib.pyplot as plt
@@ -52,8 +52,8 @@ def test(model):
     return test_loss
 
 
-dataset = gsp_nilm_dataset.NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
-data = dataset[0]
+# dataset = gsp_dataset.NilmDataset(root='data', filename='kitchen_outlets_house_2_x.csv', window=10, sigma=20)
+data = torch.load('/home/leonidas/PycharmProjects/GNN_based_NILM/data/processed/kitchen_outlets_house_2_x.pt')
 print(data)
 
 transform = RandomLinkSplit(is_undirected=True)
