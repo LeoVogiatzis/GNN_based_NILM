@@ -242,13 +242,12 @@ def conventional_ml(train_data):
 dataset = NilmDataset(root='data', filename='dishwasher.csv', window=20, sigma=20)
 data = dataset[0]
 print(data)
-# data = data.to(device)
-# degrees = torch_geometric.utils.degree(data.edge_index[0])
-#     n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
-#     data.x = degrees
-#     print(data)
-# data.x = degrees.reshape((-1, 1))
-
+data = data.to(device)
+degrees = torch_geometric.utils.degree(data.edge_index[0])
+n_cuts = torch_geometric.utils.normalized_cut(edge_index=data.edge_index, edge_attr=data.edge_attr)
+data.x = degrees
+print(data)
+data.x = degrees.reshape((-1, 1))
 
 data.y = data.y.type(torch.FloatTensor)
 
@@ -276,6 +275,7 @@ for epoch in range(1, 20):
     train_losses.append(loss.item())
     val_losses.append(test_loss.item())
     print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
+
 print(model)
 plt.figure(figsize=(10, 5))
 plt.title("Training and Validation Loss")
