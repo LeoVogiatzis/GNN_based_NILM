@@ -19,6 +19,8 @@ import sys
 import seaborn as sns
 import os
 from torchmetrics import MeanAbsolutePercentageError
+from sklearn.model_selection import GridSearchCV
+import warnings
 
 
 class GCN(torch.nn.Module):
@@ -57,18 +59,12 @@ def train(model):
     out = model(train_data.x, train_data.edge_index)
     print(out)
     print(train_data.y)
-    # loss = criterion(out[dataset.train_mask], dataset.y[dataset.train_mask])  # Compute the loss solely based on the training nodes.
-    # loss = criterion(out, train_data.y.view(-1, 1))
     # import pdb;pdb.set_trace()
-    # loss = (out - train_data.y.view(-1, 1))**2
-    # loss[train_data.y.view(-1, 1)!=0] *= 100
-    # loss = torch.mean(loss)
     # loss = weighted_mse_loss(out.squeeze(), train_data.y.squeeze())
-    loss = criterion(out.squeeze(), train_data.y.squeeze())  # view(-1, 1))
-    # loss = loss * sample_weight
+    # loss = criterion(out.squeeze(), train_data.y.squeeze())  # view(-1, 1))
     loss.backward(retain_graph=True)  # Derive gradients.
     optimizer.step()  # Update parameters based on gradients.
-    # scheduler.step()
+    scheduler.step()
     return loss
 
 
@@ -135,13 +131,7 @@ def plots(data):
         plt.xlabel('Ranking', fontsize=10)
         plt.ylabel('Count', fontsize=10)
         plt.savefig('microwave_' + Centralities[i] + '.png')
-        # plt.savefig(f'/home/leonidas/PycharmProjects/GNN_based_NILM/Centralities/my_test{i}.eps')
         plt.show()
-
-        # plt.hist(data.x[:, i].cpu().detach().numpy(), bins=100)
-        # plt.yscale('log')
-        # plt.show()
-    # exit()
 
 
 def conventional_ml(train_data, test_data):
@@ -153,71 +143,32 @@ def conventional_ml(train_data, test_data):
         'min_samples_split': [8, 10, 12],
         'n_estimators': [100, 200, 300, 1000]
     }
-    # param_grid = {
-    #     'bootstrap': [True],
-    #     'max_depth': [80, 90, 100, 110],
-    #     'max_samples': [0.25, 0.5, 0.75],
-    #     'max_features': [2, 3, 4],
-    #     'min_samples_leaf': [2, 3, 4, 5],
-    #     'min_samples_split': [7, 8, 9, 10, 12],
-    #     'n_estimators': [50, 100, 200, 300, 1000]
-    # }
+    regr = RandomForestRegressor(random_state=0)
 
-    from sklearn.model_selection import GridSearchCV
-    import warnings
-    base_model = RandomForestRegressor(n_estimators=10, random_state=42)
-    base_model.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
-    base_accuracy = evaluate(base_model, train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
-    return base_model.predict(test_data.x.detach().numpy()).reshape(-1)
-    # regr = RandomForestRegressor(random_state=0)
-    #
-    # CV_regr = GridSearchCV(estimator=regr, param_grid=param_grid,
-    #                        cv=5, n_jobs=-1, verbose=2, return_train_score=True)
-    #
-    # with warnings.catch_warnings(record=True) as w:
-    #     try:
-    #         CV_regr.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
-    #     except ValueError:
-    #         pass
-    #     # print(repr(w[-1].message))
-    # # train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel()
-    # # CV_regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
-    # print(f'best parameters: {CV_regr.best_params_}')
-    # best_grid = CV_regr.best_estimator_
-    #
-    # grid_accuracy = evaluate(best_grid, test_data.x.detach().numpy(), test_data.y.detach().numpy().ravel())
-    # print('Improvement of {:0.2f}%.'.format(100 * (grid_accuracy - base_accuracy) / base_accuracy))
-    #
-    # mse = mean_squared_error(np.array(test_data.y.detach().numpy().ravel()), best_grid.predict(test_data.x.detach().numpy()))  # .reshape(-1, 1)
-    # mae = mean_absolute_error(test_data.y.detach().numpy().ravel(), best_grid.predict(test_data.x.detach().numpy()))
-    # print(f'best_estimator {best_grid}')
-    # print(f'mse: {mse}')
-    # print(f'mae: {mae}')
-    # return best_grid.predict(test_data.x.detach().numpy()).reshape(-1)
+    CV_regr = GridSearchCV(estimator=regr, param_grid=param_grid,
+                           cv=5, n_jobs=-1, verbose=2, return_train_score=True)
 
+    with warnings.catch_warnings(record=True) as w:
+        try:
+            CV_regr.fit(train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel())
+        except ValueError:
+            pass
+        # print(repr(w[-1].message))
+    # train_data.x.detach().numpy(), train_data.y.detach().numpy().ravel()
+    # CV_regr.fit(np.array(train_data.x), np.array(train_data.y).ravel())
+    print(f'best parameters: {CV_regr.best_params_}')
+    best_grid = CV_regr.best_estimator_
 
-#
-# parser = argparse.ArgumentParser(description='Node Regression Pipeline')
-# parser.add_argument('--Epochs', help='Insert  the epochs')
-# parser.add_argument('--learning-rate', type=int,
-#                     help='Insert (block height/Unix Epoch time)')
-# parser.add_argument('--p', help='dropout')
-#
-# parser.add_argument('--time', type=int,
-#                     help='Insert (block height/Unix Epoch time)')
-# parser.add_argument('--public_key', help='Insert a public key')
-# parser.add_argument('--time', type=int,
-#                     help='Insert (block height/Unix Epoch time)')
-# parser.add_argument('--public_key', help='Insert a public key')
-# parser.add_argument('--time', type=int,
-#                     help='Insert (block height/Unix Epoch time)')
-#
+    grid_accuracy = evaluate(best_grid, test_data.x.detach().numpy(), test_data.y.detach().numpy().ravel())
+    print('Improvement of {:0.2f}%.'.format(100 * (grid_accuracy - base_accuracy) / base_accuracy))
 
-
-# args = parser.parse_args()
-# public_key = args.public_key
-# absolute_param = args.time
-#
+    mse = mean_squared_error(np.array(test_data.y.detach().numpy().ravel()),
+                             best_grid.predict(test_data.x.detach().numpy()))  # .reshape(-1, 1)
+    mae = mean_absolute_error(test_data.y.detach().numpy().ravel(), best_grid.predict(test_data.x.detach().numpy()))
+    print(f'best_estimator {best_grid}')
+    print(f'mse: {mse}')
+    print(f'mae: {mae}')
+    return best_grid.predict(test_data.x.detach().numpy()).reshape(-1)
 
 
 path = r'data/median_filtering_Min_Max'
@@ -225,8 +176,6 @@ all_files = glob.glob(path + "/*.pt")
 devices = [filename for filename in all_files]
 index = 0
 for filename in all_files:
-    # if not filename.__contains__('microwave_6_house2.pt'):
-    #     continue
     data = torch.load(f'{filename}')
 
     print('-------------------------------------------------------------------')
@@ -234,24 +183,9 @@ for filename in all_files:
 
     means, stds = data.x.mean(), data.x.std()
     data.x = (data.x - means) / stds
-
-    # means, stds = data.y.mean(), data.y.std()
-    # data.y = (data.y - means) / stds
-
-    # plots(data)
-    # continue
-
     data.num_classes = len(data.y.unique())
-    # plots(data)
-    # continue
-
-    # v_min, v_max = data.y.min(), data.y.max()
-    # new_min, new_max = -.1, .25
-    # data.y = (data.y - v_min) / (v_max - v_min) * (new_max - new_min) + new_min
 
     methods = ['features', 'Node2Vec', 'AE']
-    # path2 = "/home/leonidas/PycharmProjects/GNN_based_NILM/Test_medd2/"
-    # os.makedirs(path2 + f"{filename.split('/')[-1].strip('.pt')}")
     data.y = data.y.type(torch.FloatTensor)
     for embedding_method in methods:
         if embedding_method == 'Node2Vec':
@@ -271,10 +205,7 @@ for filename in all_files:
         print(data.x)
         print(data.y)
         print(data)
-        # plots(data)
-        # continue
-        # transform = RandomNodeSplit()
-        # data = transform(data)
+        plots(data)
 
         transform = RandomLinkSplit(is_undirected=True)
         train_data, val_data, test_data = transform(data)
@@ -282,17 +213,15 @@ for filename in all_files:
         index += 1
 
         pred = conventional_ml(train_data, test_data)
-        # plt.rcParams["figure.figsize"] = (15, 6)
+        plt.rcParams["figure.figsize"] = (15, 6)
         sns.set_theme()
         plt.title("Predicted/ G-truth")
         plt.plot(pred, label="pred")
         plt.plot(test_data.y.view(-1, 1), label="g_truth", alpha=0.5)
-        # plt.title(str(index))
         plt.xlabel("timestep")
         plt.ylabel("delta_p")
         plt.legend()
         plt.tight_layout()
-        # plt.savefig(path2 + f"{filename.split('/')[-1].strip('.pt')}" + "/" + embedding_method + '.png')
         plt.show()
 
         from utils import mse
@@ -304,6 +233,7 @@ for filename in all_files:
         y_hat = np.mean(y_true)
         print(mse(np.array([y_hat] * y_true.shape[0]), y_true))
         from sklearn import metrics
+
         mean_abs_percentage_error = MeanAbsolutePercentageError()
 
         print('Mean Absolute Error (MAE):', metrics.mean_absolute_error(np.array(test_data.y.view(-1, 1)), pred))
@@ -315,14 +245,10 @@ for filename in all_files:
         print('Accuracy:', round(100 * (1 - mape), 2))
         print(mse(np.array(test_data.y.view(-1, 1)), pred))
         print('Random Forest')
-
-
-        continue
-        # model = GCN(hidden_channels=4)
         model = GCN(in_channels=4, hidden_channels=4, out_channels=1)
 
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 100, eta_min=0, last_epoch=-1, verbose=False)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 100, eta_min=0, last_epoch=-1, verbose=False)
         criterion = torch.nn.MSELoss()
         epochs = 20
         train_losses = []
@@ -337,8 +263,6 @@ for filename in all_files:
             print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
         print(model)
 
-
-
         results = model(data.x, data.edge_index)
         results = results.detach().numpy().reshape(-1)
         print(results)
@@ -350,25 +274,8 @@ for filename in all_files:
         plt.ylabel("delta_p")
         plt.legend()
         plt.tight_layout()
-        # plt.savefig(path2 + f"{filename.split('/')[-1].strip('.pt')}" + "/" + embedding_method + 'Train' + '.png')
-        plt.show()
-        # # plt.savefig('foo.png')
-        # continue
-        # plt.show()
-
-        plt.title("Predicted/ G-truth")
-        plt.plot(out.detach().numpy().reshape(-1), label="pred")
-        plt.plot(test_data.y.view(-1, 1), label="g_truth", alpha=0.5)
-        # plt.title(filename.split('/')[-1].strip('.csv'))
-        plt.xlabel("timestep")
-        plt.ylabel("delta_p")
-        plt.legend()
-        # plt.savefig(path2 + f"{filename.split('/')[-1].strip('.pt')}" + "/" + embedding_method + 'Pre_G_truth' + '.png')
-        # plt.savefig('foo.png')
-
         plt.show()
 
-        # plt.figure(figsize=(10, 5))
         plt.title("Training and Validation Loss")
         plt.plot(val_losses, label="test")
         plt.plot(train_losses, label="train")
@@ -376,6 +283,5 @@ for filename in all_files:
         plt.ylabel("Loss")
         plt.legend()
         plt.tight_layout()
-        # plt.savefig(path2 + f"{filename.split('/')[-1].strip('.pt')}" + "/" + embedding_method + 'loss' + '.png')
         plt.show()
         print('------------------------------End Pipeline-----------------------------')
