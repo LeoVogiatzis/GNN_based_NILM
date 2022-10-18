@@ -13,14 +13,6 @@ import networkx as nx
 import numpy as np
 
 global label
-import argparse
-import os.path
-from os import path
-from itertools import combinations
-from scipy.spatial.distance import pdist, squareform, cdist
-from scipy.spatial import distance
-import scipy
-import itertools
 
 
 def read_label():
@@ -35,8 +27,7 @@ def read_label():
     return label
 
 
-labe[data.test_mask]
-ls = read_label()
+labels = read_label()
 for i in range(1, 7):
     print('House {}: '.format(i), labels[i], '\n')
 
@@ -103,15 +94,11 @@ for i in range(1, 3):
     print('House {} data has shape: '.format(i), df[i].shape)
     display(df[i].tail(3))
 
-# # df = {}
-# for i in range(1, 7):
 house2 = df[2].transform(lambda x: median_filter(x))
 house2 = standardization(house2)
 house2.to_csv('/home/leonidas/PycharmProjects/GNN_based_NILM/data/House.csv')
-exit()
-# # write_appliance_files(df[i])
-# x = 1
-# exit()
+write_appliance_files(df[i])
+
 for i in df.keys():
     print(df[i].shape[0])
     df[i] = df[i].resample('1T').sum()
